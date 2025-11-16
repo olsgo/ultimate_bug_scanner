@@ -175,6 +175,54 @@
       }
     },
     {
+      "id": "js-async-errors-buggy",
+      "description": "JS async error path coverage regression (await without try/catch, Promise chains missing .catch).",
+      "path": "test-suite/js/buggy/async_errors.js",
+      "language": "js",
+      "tags": [
+        "js",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=js",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "js-async-errors-clean",
+      "description": "JS async error coverage clean baseline (all awaits guarded).",
+      "path": "test-suite/js/clean/async_errors.js",
+      "language": "js",
+      "tags": [
+        "js",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=js"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
+          }
+        }
+      }
+    },
+    {
       "id": "python-buggy",
       "description": "Python buggy fixtures (enable once python module assertions stabilize).",
       "path": "test-suite/python/buggy",
@@ -227,6 +275,54 @@
       }
     },
     {
+      "id": "python-async-errors-buggy",
+      "description": "Python async error path regression (await outside try and fire-and-forget tasks).",
+      "path": "test-suite/python/buggy/async_errors.py",
+      "language": "python",
+      "tags": [
+        "python",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=python",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "python-async-errors-clean",
+      "description": "Python async error coverage clean baseline (await guarded + tasks awaited/cancelled).",
+      "path": "test-suite/python/clean/async_errors.py",
+      "language": "python",
+      "tags": [
+        "python",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=python"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
+          }
+        }
+      }
+    },
+    {
       "id": "golang-buggy",
       "description": "Go buggy fixtures exercising goroutine/context/network pitfalls.",
       "path": "test-suite/golang/buggy",
@@ -274,6 +370,54 @@
           },
           "warning": {
             "max": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "golang-async-errors-buggy",
+      "description": "Go goroutines ignoring error paths (fire-and-forget http.Get).",
+      "path": "test-suite/golang/buggy/async_errors.go",
+      "language": "golang",
+      "tags": [
+        "golang",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=golang",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "golang-async-errors-clean",
+      "description": "Go goroutines reporting errors via checks/channels baseline.",
+      "path": "test-suite/golang/clean/async_errors.go",
+      "language": "golang",
+      "tags": [
+        "golang",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=golang"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
           }
         }
       }
@@ -357,6 +501,54 @@
       }
     },
     {
+      "id": "cpp-async-errors-buggy",
+      "description": "C++ std::async futures without try/catch or get().",
+      "path": "test-suite/cpp/buggy/async_errors.cpp",
+      "language": "cpp",
+      "tags": [
+        "cpp",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=cpp",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "cpp-async-errors-clean",
+      "description": "C++ async clean baseline (std::async guarded by try/catch + get).",
+      "path": "test-suite/cpp/clean/async_errors.cpp",
+      "language": "cpp",
+      "tags": [
+        "cpp",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=cpp"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
+          }
+        }
+      }
+    },
+    {
       "id": "cpp-resource-lifecycle",
       "description": "C++ std::thread/malloc cleanup regression.",
       "path": "test-suite/cpp/buggy/resource_lifecycle.cpp",
@@ -380,6 +572,54 @@
         "require_substrings": [
           "RESOURCE LIFECYCLE"
         ]
+      }
+    },
+    {
+      "id": "rust-async-errors-buggy",
+      "description": "Rust awaits lacking ?/match handling + tokio::spawn handles dropped.",
+      "path": "test-suite/rust/buggy/async_errors.rs",
+      "language": "rust",
+      "tags": [
+        "rust",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=rust",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "rust-async-errors-clean",
+      "description": "Rust async clean baseline (await guarded and JoinHandle awaited).",
+      "path": "test-suite/rust/clean/async_errors.rs",
+      "language": "rust",
+      "tags": [
+        "rust",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=rust"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
+          }
+        }
       }
     },
     {
@@ -409,6 +649,54 @@
       }
     },
     {
+      "id": "java-async-errors-buggy",
+      "description": "Java CompletableFuture chains lacking exceptionally()/try-catch.",
+      "path": "test-suite/java/buggy/AsyncErrors.java",
+      "language": "java",
+      "tags": [
+        "java",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=java",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "java-async-errors-clean",
+      "description": "Java async clean baseline (future.get wrapped + exceptionally handler).",
+      "path": "test-suite/java/clean/AsyncErrors.java",
+      "language": "java",
+      "tags": [
+        "java",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=java"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
+          }
+        }
+      }
+    },
+    {
       "id": "java-resource-lifecycle",
       "description": "Java ExecutorService shutdown regression.",
       "path": "test-suite/java/buggy/ResourceLifecycle.java",
@@ -432,6 +720,54 @@
         "require_substrings": [
           "RESOURCE LIFECYCLE"
         ]
+      }
+    },
+    {
+      "id": "ruby-async-errors-buggy",
+      "description": "Ruby Thread.new blocks lacking rescue/exception handling.",
+      "path": "test-suite/ruby/buggy/async_errors.rb",
+      "language": "ruby",
+      "tags": [
+        "ruby",
+        "async",
+        "buggy"
+      ],
+      "args": [
+        "--only=ruby",
+        "--fail-on-warning"
+      ],
+      "expect": {
+        "exit_code": "nonzero",
+        "totals": {
+          "warning": {
+            "min": 1
+          }
+        },
+        "require_substrings": [
+          "Async error path coverage"
+        ]
+      }
+    },
+    {
+      "id": "ruby-async-errors-clean",
+      "description": "Ruby thread bodies with begin/rescue baseline.",
+      "path": "test-suite/ruby/clean/async_errors.rb",
+      "language": "ruby",
+      "tags": [
+        "ruby",
+        "async",
+        "clean"
+      ],
+      "args": [
+        "--only=ruby"
+      ],
+      "expect": {
+        "exit_code": "zero",
+        "totals": {
+          "warning": {
+            "max": 0
+          }
+        }
       }
     },
     {
