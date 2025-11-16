@@ -233,8 +233,16 @@ show_detailed_finding() {
 }
 
 # Temporarily relax pipefail for grep-heavy scans to avoid ERR on 1/no-match
-begin_scan_section(){ if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set +o pipefail; fi; }
-end_scan_section(){ if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set -o pipefail; fi; }
+begin_scan_section(){
+  if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set +o pipefail; fi
+  set +e
+  trap - ERR
+}
+end_scan_section(){
+  trap on_err ERR
+  set -e
+  if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set -o pipefail; fi
+}
 
 # ────────────────────────────────────────────────────────────────────────────
 # ast-grep: detection, rule packs, and wrappers
@@ -725,7 +733,7 @@ count=
 if [[ "$HAS_AST_GREP" -eq 1 ]]; then
   deep_guard_json=$(analyze_deep_property_guards "$DETAIL_LIMIT")
   if [[ -n "$deep_guard_json" ]]; then
-    local parsed_counts
+    parsed_counts=""
     parsed_counts=$(python3 - <<'PY' <<<"$deep_guard_json"
 import json, sys
 try:
@@ -1599,7 +1607,7 @@ echo ""
 if [ "$VERBOSE" -eq 0 ]; then
   say "${DIM}Tip: Run with -v/--verbose for more code samples per finding.${RESET}"
 fi
-say "${DIM}Add to pre-commit: ./scripts/bug-scanner.sh --ci --fail-on-warning . > bug-scan-report.txt${RESET}"
+say "${DIM}Add to pre-commit: ./ubs --ci --fail-on-warning . > bug-scan-report.txt${RESET}"
 echo ""
 
 EXIT_CODE=0

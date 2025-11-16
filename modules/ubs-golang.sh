@@ -236,8 +236,16 @@ show_detailed_finding() {
 }
 
 # Temporarily relax pipefail for grep-heavy scans
-begin_scan_section(){ if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set +o pipefail; fi; }
-end_scan_section(){ if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set -o pipefail; fi; }
+begin_scan_section(){
+  if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set +o pipefail; fi
+  set +e
+  trap - ERR
+}
+end_scan_section(){
+  trap on_err ERR
+  set -e
+  if [[ "$DISABLE_PIPEFAIL_DURING_SCAN" -eq 1 ]]; then set -o pipefail; fi
+}
 
 # ────────────────────────────────────────────────────────────────────────────
 # ast-grep: detection, rule packs, and wrappers (Go heavy)
@@ -1050,7 +1058,7 @@ echo ""
 if [ "$VERBOSE" -eq 0 ]; then
   say "${DIM}Tip: Run with -v/--verbose for more code samples per finding.${RESET}"
 fi
-say "${DIM}Add to pre-commit: ./go-bug-scanner.sh --ci --fail-on-warning . > go-scan-report.txt${RESET}"
+say "${DIM}Add to pre-commit: ./ubs --ci --fail-on-warning . > go-scan-report.txt${RESET}"
 echo ""
 
 EXIT_CODE=0
