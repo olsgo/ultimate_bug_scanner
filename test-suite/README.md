@@ -6,25 +6,54 @@ This test suite provides comprehensive examples of buggy and clean JavaScript co
 
 ```
 test-suite/
-├── buggy/          # Code with intentional bugs (scanner SHOULD find issues)
-│   ├── 01-null-safety.js
-│   ├── 02-security.js
-│   ├── 03-async-await.js
-│   ├── 04-memory-leaks.js
-│   ├── 05-type-coercion.js
-│   ├── 06-math-errors.js
-│   ├── 07-error-handling.js
-│   ├── 08-control-flow.js
-│   ├── 09-debugging-production.js
-│   ├── 10-variable-scope.js
-│   └── 11-combined-issues.js
+├── buggy/                      # Core bug patterns (scanner SHOULD find issues)
+│   ├── 01-null-safety.js              # Null pointer bugs, unguarded access
+│   ├── 02-security.js                 # XSS, eval, hardcoded secrets
+│   ├── 03-async-await.js              # Promise handling, missing await
+│   ├── 04-memory-leaks.js             # Event listeners, timers, leaks
+│   ├── 05-type-coercion.js            # Loose equality, NaN, typeof issues
+│   ├── 06-math-errors.js              # Division by zero, parseInt bugs
+│   ├── 07-error-handling.js           # Empty catch, throwing strings
+│   ├── 08-control-flow.js             # Switch fallthrough, unreachable code
+│   ├── 09-debugging-production.js     # debugger, console.log, TODOs
+│   ├── 10-variable-scope.js           # var usage, global pollution
+│   ├── 11-combined-issues.js          # Multiple bug types together
+│   ├── 12-regex-vulnerabilities.js    # ReDoS, catastrophic backtracking
+│   ├── 13-prototype-pollution.js      # __proto__ attacks, unsafe merge
+│   ├── 14-injection-attacks.js        # SQL, NoSQL, command injection
+│   ├── 15-race-conditions.js          # TOCTOU, data races, atomicity
+│   ├── 16-crypto-mistakes.js          # Weak crypto, hardcoded keys
+│   ├── 17-dom-manipulation.js         # DOM clobbering, layout thrashing
+│   ├── 18-api-misuse.js               # Framework/library misuse
+│   ├── 19-performance-anti-patterns.js # N+1 queries, blocking operations
+│   └── 20-configuration-errors.js     # CORS, CSP, security headers
 │
-├── clean/          # Best practices code (scanner should pass with minimal issues)
-│   ├── 01-null-safety-clean.js
-│   ├── 02-security-clean.js
-│   └── 03-async-await-clean.js
+├── clean/                      # Best practices (minimal issues expected)
+│   ├── 01-null-safety-clean.js        # Proper null checks, optional chaining
+│   ├── 02-security-clean.js           # Secure coding, safe APIs
+│   ├── 03-async-await-clean.js        # Proper async patterns, error handling
+│   ├── 04-error-handling-clean.js     # Try-catch, Error objects, cleanup
+│   ├── 05-memory-management-clean.js  # Event cleanup, WeakMap, streams
+│   └── 06-performance-clean.js        # Optimization patterns, caching
 │
-└── README.md       # This file
+├── frameworks/                 # Framework-specific tests
+│   ├── react/
+│   │   ├── buggy-component.jsx        # React anti-patterns (28 issues)
+│   │   └── clean-component.jsx        # React best practices
+│   └── node/
+│       ├── buggy-api.js               # Express/Node bugs (35 issues)
+│       └── clean-api.js               # Secure API patterns
+│
+├── realistic/                  # Real-world application scenarios
+│   ├── buggy-ecommerce-checkout.js    # E-commerce bugs (35+ issues)
+│   └── buggy-auth-system.js           # Authentication flaws (40+ issues)
+│
+├── edge-cases/                 # Specialized edge case categories
+│   ├── unicode-bugs.js                # Unicode, encoding, graphemes
+│   ├── timezone-date-bugs.js          # Dates, timezones, DST, leap years
+│   └── floating-point-bugs.js         # Precision, money, rounding
+│
+└── README.md                   # This file
 ```
 
 ## 🧪 Running Tests
@@ -79,7 +108,7 @@ ubs test-suite/clean/ | grep -E "Critical|Warning|Info"
 
 ## 📊 Expected Results
 
-### Buggy Code (test-suite/buggy/)
+### Buggy Code - Core Patterns (test-suite/buggy/)
 
 Each file contains **intentional bugs** that the scanner should detect:
 
@@ -96,18 +125,69 @@ Each file contains **intentional bugs** that the scanner should detect:
 | `09-debugging-production.js` | 12+ CRITICAL | debugger statements, console.log, sensitive data logging |
 | `10-variable-scope.js` | 14+ WARNING/CRITICAL | var usage, global pollution, variable shadowing |
 | `11-combined-issues.js` | 20+ MIXED | Realistic codebase with multiple bug types |
+| `12-regex-vulnerabilities.js` | 15+ CRITICAL | ReDoS attacks, catastrophic backtracking, regex bombs |
+| `13-prototype-pollution.js` | 18+ CRITICAL | __proto__ pollution, unsafe merge/clone operations |
+| `14-injection-attacks.js` | 20+ CRITICAL | SQL, NoSQL, command, XPath, LDAP injection |
+| `15-race-conditions.js` | 18+ CRITICAL/WARNING | TOCTOU bugs, non-atomic operations, data races |
+| `16-crypto-mistakes.js` | 22+ CRITICAL | MD5/SHA1, hardcoded keys, weak random, ECB mode |
+| `17-dom-manipulation.js` | 18+ WARNING/CRITICAL | DOM clobbering, layout thrashing, memory leaks |
+| `18-api-misuse.js` | 20+ WARNING/CRITICAL | Array.forEach misuse, promise handling, this binding |
+| `19-performance-anti-patterns.js` | 20+ WARNING | N+1 queries, blocking I/O, memory accumulation |
+| `20-configuration-errors.js` | 18+ CRITICAL | CORS, CSP, missing security headers, weak sessions |
 
-**Total Expected:** 100+ issues across all categories
+**Core Patterns Total:** 275+ issues
 
-### Clean Code (test-suite/clean/)
+### Framework-Specific Tests
+
+| File | Expected Issues | Description |
+|------|----------------|-------------|
+| `frameworks/react/buggy-component.jsx` | 28+ CRITICAL/WARNING | React anti-patterns, hooks violations, memory leaks |
+| `frameworks/react/clean-component.jsx` | 0-2 | React best practices, proper hooks, memoization |
+| `frameworks/node/buggy-api.js` | 35+ CRITICAL | Express security flaws, SQL injection, no validation |
+| `frameworks/node/clean-api.js` | 0-2 | Secure API, validation, rate limiting, graceful shutdown |
+
+**Frameworks Total:** 63+ issues in buggy files
+
+### Realistic Scenarios
+
+| File | Expected Issues | Description |
+|------|----------------|-------------|
+| `realistic/buggy-ecommerce-checkout.js` | 35+ CRITICAL | Real e-commerce bugs: race conditions, price manipulation |
+| `realistic/buggy-auth-system.js` | 40+ CRITICAL | Auth catastrophes: SQL injection, weak crypto, IDOR |
+
+**Realistic Total:** 75+ issues
+
+### Edge Cases
+
+| File | Expected Issues | Description |
+|------|----------------|-------------|
+| `edge-cases/unicode-bugs.js` | 15+ WARNING | Unicode handling, grapheme clusters, homoglyphs |
+| `edge-cases/timezone-date-bugs.js` | 18+ WARNING | Date arithmetic, DST, timezone handling, leap years |
+| `edge-cases/floating-point-bugs.js` | 16+ WARNING | Money calculations, precision loss, rounding errors |
+
+**Edge Cases Total:** 49+ issues
+
+### Clean Code Examples (test-suite/clean/)
 
 | File | Expected Issues | Notes |
 |------|----------------|-------|
-| `01-null-safety-clean.js` | 0-2 | Best practices: optional chaining, null checks, guards |
-| `02-security-clean.js` | 0-1 | Safe: textContent, env vars, strong crypto, HTTPS |
-| `03-async-await-clean.js` | 0-1 | Proper: try/catch, Promise.all, error handling |
+| `01-null-safety-clean.js` | 0-2 | Optional chaining, null checks, guard clauses |
+| `02-security-clean.js` | 0-1 | textContent, env vars, strong crypto, parameterized queries |
+| `03-async-await-clean.js` | 0-1 | try/catch, Promise.all, AbortController, cleanup |
+| `04-error-handling-clean.js` | 0-1 | Error objects, try-finally, validation, retry logic |
+| `05-memory-management-clean.js` | 0-2 | Event cleanup, WeakMap, streams, object pooling |
+| `06-performance-clean.js` | 0-2 | Memoization, debouncing, virtual scrolling, lazy loading |
 
-**Total Expected:** 0-5 minor issues (mostly INFO level)
+**Clean Code Total:** 0-10 minor issues (mostly INFO level)
+
+---
+
+### 📈 Overall Test Suite Summary
+
+- **Total Buggy Files:** 29 files
+- **Total Expected Bugs:** 460+ issues across all categories
+- **Total Clean Files:** 10 files
+- **Coverage:** Security, Performance, Concurrency, Edge Cases, Framework Patterns
 
 ## 🎯 What Each File Tests
 
@@ -190,6 +270,69 @@ Each file contains **intentional bugs** that the scanner should detect:
 - Security + async + null safety + performance issues
 - Tests scanner's ability to find diverse issues in real-world code
 
+#### 12-regex-vulnerabilities.js
+- **CRITICAL:** ReDoS (Regular Expression Denial of Service) attacks
+- Catastrophic backtracking with nested quantifiers
+- Regex bombs and performance killers
+- Unsafe user input in regex patterns
+- Global regex state bugs
+
+#### 13-prototype-pollution.js
+- **CRITICAL:** Object.prototype pollution via merge/clone
+- `__proto__` and `constructor.prototype` manipulation
+- Recursive merge vulnerabilities
+- Path traversal in object property access
+- Unsafe for...in loops without hasOwnProperty
+
+#### 14-injection-attacks.js
+- **CRITICAL:** SQL injection (string concatenation in queries)
+- NoSQL injection (MongoDB operator injection)
+- Command injection (exec, spawn with user input)
+- LDAP, XPath, GraphQL injection
+- CSV/Formula injection, XXE attacks
+
+#### 15-race-conditions.js
+- **CRITICAL:** TOCTOU (Time-of-Check Time-of-Use) bugs
+- Non-atomic read-modify-write operations
+- Database race conditions (check-then-insert)
+- Shared mutable state in async contexts
+- Double-checked locking without proper synchronization
+
+#### 16-crypto-mistakes.js
+- **CRITICAL:** MD5 and SHA1 usage (cryptographically broken)
+- Hardcoded encryption keys and IVs
+- ECB mode usage (leaks patterns)
+- Weak random number generation (Math.random for security)
+- No password salt, insufficient PBKDF2 iterations
+
+#### 17-dom-manipulation.js
+- DOM clobbering via form elements
+- Layout thrashing (read-write-read-write)
+- Detached DOM nodes causing memory leaks
+- Setting dangerous attributes (href="javascript:")
+- Creating elements in loops (performance)
+
+#### 18-api-misuse.js
+- Array.forEach with return (doesn't work)
+- Modifying arrays while iterating
+- Misunderstanding Promise.all behavior
+- Using delete on arrays (leaves holes)
+- Array.sort without comparator function
+
+#### 19-performance-anti-patterns.js
+- N+1 query problems (database)
+- Blocking event loop (synchronous I/O)
+- Regex compilation in loops
+- String concatenation in loops (O(n²))
+- Memory leaks (unbounded cache growth)
+
+#### 20-configuration-errors.js
+- **CRITICAL:** Wildcard CORS with credentials
+- Missing security headers (CSP, X-Frame-Options, HSTS)
+- Weak session configuration
+- Exposing server version information
+- No rate limiting on sensitive endpoints
+
 ### Clean Files
 
 #### 01-null-safety-clean.js
@@ -212,6 +355,130 @@ Each file contains **intentional bugs** that the scanner should detect:
 - ✅ `Promise.all()` for parallelization
 - ✅ `.catch()` on promises
 - ✅ Timeout handling
+
+#### 04-error-handling-clean.js
+- ✅ Specific error handling by type
+- ✅ Error objects with context
+- ✅ Try-catch with finally for cleanup
+- ✅ Error boundaries and centralized handling
+- ✅ Validation before risky operations
+
+#### 05-memory-management-clean.js
+- ✅ Event listener cleanup
+- ✅ Timer cleanup (clearInterval/clearTimeout)
+- ✅ WeakMap for metadata (allows GC)
+- ✅ LRU cache with size limits
+- ✅ Stream processing for large data
+- ✅ Object pooling for performance
+
+#### 06-performance-clean.js
+- ✅ DocumentFragment for batch DOM updates
+- ✅ Debouncing and throttling
+- ✅ Memoization for expensive computations
+- ✅ Virtual scrolling for large lists
+- ✅ RequestAnimationFrame for animations
+- ✅ Web Workers for heavy computation
+
+### Framework-Specific Tests
+
+#### frameworks/react/buggy-component.jsx
+- Missing dependencies in useEffect
+- Direct state mutation
+- Using index as key
+- Memory leaks (no cleanup)
+- Calling hooks conditionally
+- Not memoizing expensive computations
+- Props mutation
+- Infinite render loops
+
+#### frameworks/react/clean-component.jsx
+- Proper useEffect dependencies with cleanup
+- Functional state updates
+- Unique stable keys
+- useMemo and useCallback for optimization
+- Context to avoid prop drilling
+- Error boundaries
+- Custom hooks for reusable logic
+- Lazy loading with Suspense
+
+#### frameworks/node/buggy-api.js
+- SQL injection vulnerabilities
+- No input validation
+- Exposing sensitive errors in responses
+- No rate limiting
+- Blocking synchronous operations
+- Memory leaks (global variables growing)
+- Hardcoded credentials
+- No authentication/authorization checks
+
+#### frameworks/node/clean-api.js
+- Parameterized queries (SQL injection prevention)
+- Input validation with express-validator
+- Security middleware (helmet, CORS)
+- Rate limiting
+- Async/await with proper error handling
+- Database connection pooling
+- Environment variables for secrets
+- Graceful shutdown handlers
+
+### Realistic Scenarios
+
+#### realistic/buggy-ecommerce-checkout.js
+Real-world e-commerce checkout flow with critical flaws:
+- Race conditions in inventory management
+- Client-side price calculation (price manipulation!)
+- No transaction handling (partial updates)
+- TOCTOU bugs in stock checking
+- Trusting client input for discounts
+- Logging credit card data
+- No idempotency (double charging)
+- Decimal precision issues with money
+
+#### realistic/buggy-auth-system.js
+Catastrophic authentication system with 40+ security flaws:
+- SQL injection in login/signup
+- Weak password hashing (MD5, same salt)
+- Predictable session IDs
+- Session fixation vulnerabilities
+- IDOR (viewing any user's data)
+- Mass assignment (privilege escalation)
+- No CSRF protection
+- Password reset without verification
+- Timing attacks
+- JWT without signature verification
+
+### Edge Cases
+
+#### edge-cases/unicode-bugs.js
+- Emoji and surrogate pair handling
+- String length with grapheme clusters
+- Unicode normalization (NFC vs NFD)
+- Case conversion with different locales
+- Homoglyph attacks
+- Zero-width characters
+- RTL override attacks
+- File extension spoofing with unicode
+
+#### edge-cases/timezone-date-bugs.js
+- Timezone-aware date handling
+- DST (Daylight Saving Time) transitions
+- Leap year calculations
+- Date arithmetic (month/day boundaries)
+- Unix timestamp seconds vs milliseconds
+- Date formatting for different locales
+- Week number calculations
+- Age calculation edge cases
+- Midnight and date boundary issues
+
+#### edge-cases/floating-point-bugs.js
+- Floating-point precision (0.1 + 0.2 !== 0.3)
+- Money calculations without proper rounding
+- Accumulating floating-point errors
+- Decimal to binary conversion issues
+- Currency conversion precision
+- Percentage calculations
+- Comparing floats for equality
+- JavaScript Number.MAX_SAFE_INTEGER limits
 
 ## 🔬 Validation Checklist
 
@@ -323,17 +590,79 @@ To add new test cases:
 
 The scanner passes validation if:
 
-1. ✅ Finds 80%+ of bugs in buggy files
-2. ✅ Produces <5 false positives on clean files
-3. ✅ Completes full suite scan in <5 seconds
-4. ✅ Correctly categorizes issues (CRITICAL vs WARNING vs INFO)
-5. ✅ Provides actionable fix suggestions
+1. ✅ **Detection Rate:** Finds 80%+ of intentional bugs (360+ of 460+ total)
+2. ✅ **False Positives:** <5% false positive rate on clean code (<10 issues)
+3. ✅ **Performance:** Completes full suite scan in <10 seconds
+4. ✅ **Categorization:** Correctly labels CRITICAL vs WARNING vs INFO
+5. ✅ **Actionable Output:** Provides clear fix suggestions with line numbers
+6. ✅ **Advanced Patterns:** Detects at least 70% of:
+   - ReDoS vulnerabilities
+   - Prototype pollution
+   - Race conditions
+   - Injection attacks (SQL, NoSQL, command)
+   - Cryptographic failures
+7. ✅ **Framework Awareness:** Identifies React and Node.js specific anti-patterns
+8. ✅ **Edge Case Handling:** Flags unicode, timezone, and floating-point issues
+
+### Benchmark Targets
+
+| Category | Target Detection Rate | Critical Issues |
+|----------|----------------------|-----------------|
+| Security (files 02, 12-14, 16, 20) | >90% | >80 |
+| Memory & Performance (04, 17, 19) | >75% | >40 |
+| Async & Concurrency (03, 15) | >80% | >25 |
+| Framework Patterns (React, Node) | >70% | >50 |
+| Realistic Scenarios | >85% | >60 |
+| Edge Cases | >60% | >30 |
 
 ---
 
-**Run the full test suite now:**
+## 🚀 Quick Start Commands
+
+**Run comprehensive validation:**
 
 ```bash
-ubs test-suite/buggy/ && echo "✅ No critical issues in buggy code (UNEXPECTED!)" || echo "✅ Found issues as expected"
-ubs test-suite/clean/ && echo "✅ Clean code passed" || echo "❌ False positives in clean code"
+# Full test suite (all 29 buggy files, 460+ expected issues)
+ubs test-suite/
+
+# Core patterns only (20 files, 275+ issues)
+ubs test-suite/buggy/
+
+# Framework-specific tests (63+ issues)
+ubs test-suite/frameworks/
+
+# Realistic scenarios (75+ issues)
+ubs test-suite/realistic/
+
+# Edge cases (49+ issues)
+ubs test-suite/edge-cases/
+
+# Clean code validation (<10 issues expected)
+ubs test-suite/clean/
+```
+
+**Category-specific scans:**
+
+```bash
+# Security-focused
+ubs test-suite/buggy/{02,12,13,14,16,20}*.js
+
+# Performance-focused
+ubs test-suite/buggy/{04,17,19}*.js
+
+# Concurrency bugs
+ubs test-suite/buggy/{03,15}*.js
+```
+
+**Before/after comparisons:**
+
+```bash
+# Null safety: before and after
+ubs test-suite/buggy/01-null-safety.js test-suite/clean/01-null-safety-clean.js
+
+# Security: before and after
+ubs test-suite/buggy/02-security.js test-suite/clean/02-security-clean.js
+
+# Async patterns: before and after
+ubs test-suite/buggy/03-async-await.js test-suite/clean/03-async-await-clean.js
 ```
