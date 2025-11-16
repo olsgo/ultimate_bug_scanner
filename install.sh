@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Ultimate Bug Scanner - Installation Script
-# https://github.com/yourusername/ultimate_bug_scanner
+# https://github.com/Dicklesworthstone/ultimate_bug_scanner
 
 VERSION="4.4"
 SCRIPT_NAME="bug-scanner.sh"
 INSTALL_NAME="ubs"
-REPO_URL="https://raw.githubusercontent.com/yourusername/ultimate_bug_scanner/main"
+REPO_URL="https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main"
 
 # Colors
 RED='\033[0;31m'
@@ -461,7 +461,7 @@ If hooks are configured, the scanner runs automatically and you don't need to in
 
 ### More Information
 
-See the [Ultimate Bug Scanner repository](https://github.com/yourusername/ultimate_bug_scanner) for complete documentation.
+See the [Ultimate Bug Scanner repository](https://github.com/Dicklesworthstone/ultimate_bug_scanner) for complete documentation.
 AGENTS_EOF
 
   success "Added section to AGENTS.md"
@@ -612,7 +612,7 @@ SUCCESS
   echo -e "${YELLOW}├──${RESET} ${BOLD}2.${RESET} Test scanner:     ${BLUE}ubs --help${RESET}"
   echo -e "${YELLOW}└──${RESET} ${BOLD}3.${RESET} Run first scan:   ${BLUE}ubs .${RESET}"
   echo ""
-  echo -e "${BOLD}${BLUE}📚 Documentation:${RESET} ${BLUE}https://github.com/yourusername/ultimate_bug_scanner${RESET}"
+  echo -e "${BOLD}${BLUE}📚 Documentation:${RESET} ${BLUE}https://github.com/Dicklesworthstone/ultimate_bug_scanner${RESET}"
   echo ""
   echo -e "${GREEN}${BOLD}Happy bug hunting! 🐛🔫${RESET}"
   echo ""

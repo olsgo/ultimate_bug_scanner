@@ -3,7 +3,7 @@
 **Industrial-grade static analysis for JavaScript/TypeScript codebases**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/yourusername/ultimate_bug_scanner)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/Dicklesworthstone/ultimate_bug_scanner)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 
 A powerful, production-ready static code analyzer that catches **1000+ types of bugs** before they hit production. Designed for modern JavaScript/TypeScript projects and seamlessly integrates with AI coding agents, git hooks, and CI/CD pipelines.
@@ -31,7 +31,7 @@ A powerful, production-ready static code analyzer that catches **1000+ types of 
 ## 📦 Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/ultimate_bug_scanner/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash
 ```
 
 The installer will:
@@ -46,7 +46,7 @@ The installer will:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ultimate_bug_scanner.git
+git clone https://github.com/Dicklesworthstone/ultimate_bug_scanner.git
 cd ultimate_bug_scanner
 
 # Make executable
@@ -133,7 +133,7 @@ fi
 
 Or use the automatic installer:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/ultimate_bug_scanner/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash
 # Select "Yes" when prompted to set up Claude Code hooks
 ```
 
@@ -170,7 +170,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install Ultimate Bug Scanner
         run: |
-          curl -fsSL https://raw.githubusercontent.com/yourusername/ultimate_bug_scanner/main/install.sh | bash -s -- --non-interactive
+          curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash -s -- --non-interactive
       - name: Run Scanner
         run: ubs . --fail-on-warning
 ```
@@ -181,7 +181,7 @@ jobs:
 code_quality:
   stage: test
   script:
-    - curl -fsSL https://raw.githubusercontent.com/yourusername/ultimate_bug_scanner/main/install.sh | bash -s -- --non-interactive
+    - curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash -s -- --non-interactive
     - ubs . --fail-on-warning
 ```
 
@@ -353,9 +353,9 @@ MIT License - see LICENSE file for details
 
 ## 📞 Support
 
-- 🐛 [Report bugs](https://github.com/yourusername/ultimate_bug_scanner/issues)
-- 💡 [Request features](https://github.com/yourusername/ultimate_bug_scanner/issues)
-- 📖 [Documentation](https://github.com/yourusername/ultimate_bug_scanner/wiki)
+- 🐛 [Report bugs](https://github.com/Dicklesworthstone/ultimate_bug_scanner/issues)
+- 💡 [Request features](https://github.com/Dicklesworthstone/ultimate_bug_scanner/issues)
+- 📖 [Documentation](https://github.com/Dicklesworthstone/ultimate_bug_scanner/wiki)
 
 ---
 
