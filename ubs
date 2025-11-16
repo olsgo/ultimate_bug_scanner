@@ -96,6 +96,12 @@ ensure_dir(){ mkdir -p "$1" 2>/dev/null || { say "${RED}$X cannot create $1${RES
 
 script_dir(){ local src="${BASH_SOURCE[0]}"; while [ -h "$src" ]; do src="$(readlink "$src")"; done; cd -P "$(dirname "$src")" && pwd; }
 
+prepare_metrics_dir(){
+  local dir="$1"
+  rm -rf "$dir" 2>/dev/null || true
+  mkdir -p "$dir" 2>/dev/null || true
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Language catalog
 # ─────────────────────────────────────────────────────────────────────────────
@@ -257,6 +263,7 @@ run_lang(){
   local out_json="$TMPDIR_RUN/$lang.json"
   local out_sarif="$TMPDIR_RUN/$lang.sarif"
   local err="$TMPDIR_RUN/$lang.err"
+  local metrics_dir="$TMPDIR_RUN/$lang.metrics"
 
   local args=("$PROJECT_DIR" "--ci")
   [[ "$FAIL_ON_WARNING" -eq 1 ]] && args+=("--fail-on-warning")
@@ -266,29 +273,41 @@ run_lang(){
   case "$fmt" in
     json)
       # attempt native JSON
-      if "$module" "${args[@]}" --format=json >"$out_json" 2>"$err"; then
+      prepare_metrics_dir "$metrics_dir"
+      if UBS_METRICS_DIR="$metrics_dir" UBS_LANG="$lang" "$module" "${args[@]}" --format=json >"$out_json" 2>"$err"; then
         if need_cmd jq && jq -e . "$out_json" >/dev/null 2>&1; then
           jq --arg language "$lang" '. + {language: $language}' "$out_json" > "$out_json.tmp" && mv "$out_json.tmp" "$out_json"
+          attach_metrics_to_json "$out_json" "$metrics_dir"
           return 0
         fi
       fi
       # fallback to text, then parse counts
-      "$module" "${args[@]}" >"$out_txt" 2>>"$err" || true
+      prepare_metrics_dir "$metrics_dir"
+      UBS_METRICS_DIR="$metrics_dir" UBS_LANG="$lang" "$module" "${args[@]}" >"$out_txt" 2>>"$err" || true
       parse_text_to_json "$lang" "$out_txt" "$out_json"
+      attach_metrics_to_json "$out_json" "$metrics_dir"
       ;;
     sarif)
-      if "$module" "${args[@]}" --format=sarif >"$out_sarif" 2>"$err"; then
+      prepare_metrics_dir "$metrics_dir"
+      if UBS_METRICS_DIR="$metrics_dir" UBS_LANG="$lang" "$module" "${args[@]}" --format=sarif >"$out_sarif" 2>"$err"; then
         # accept raw SARIF or sarifLog-wrapped
         if need_cmd jq && jq -e . "$out_sarif" >/dev/null 2>&1; then
+          attach_metrics_to_json "$out_json" "$metrics_dir" 2>/dev/null || true
           return 0
         fi
       fi
       # Fallback: produce a minimal SARIF summary from parsed text
-      "$module" "${args[@]}" >"$out_txt" 2>>"$err" || true
+      prepare_metrics_dir "$metrics_dir"
+      UBS_METRICS_DIR="$metrics_dir" UBS_LANG="$lang" "$module" "${args[@]}" >"$out_txt" 2>>"$err" || true
       minimal_sarif_from_text "$lang" "$out_txt" >"$out_sarif"
+      parse_text_to_json "$lang" "$out_txt" "$out_json"
+      attach_metrics_to_json "$out_json" "$metrics_dir"
       ;;
     text|*)
-      "$module" "${args[@]}" >"$out_txt" 2>"$err" || true
+      prepare_metrics_dir "$metrics_dir"
+      UBS_METRICS_DIR="$metrics_dir" UBS_LANG="$lang" "$module" "${args[@]}" >"$out_txt" 2>"$err" || true
+      parse_text_to_json "$lang" "$out_txt" "$out_json"
+      attach_metrics_to_json "$out_json" "$metrics_dir"
       ;;
   esac
 }
@@ -307,6 +326,39 @@ parse_text_to_json(){
   cat >"$json" <<JSON
 {"language":"$lang","project":"$PROJECT_DIR","files":$files,"critical":$critical,"warning":$warning,"info":$info,"timestamp":"$(date_iso)"}
 JSON
+}
+
+attach_metrics_to_json(){
+  local json_path="$1" metrics_dir="$2"
+  [[ -f "$json_path" ]] || return 0
+  [[ -d "$metrics_dir" ]] || return 0
+  local files=()
+  while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$metrics_dir" -maxdepth 1 -type f -name '*.json' -print0 2>/dev/null)
+  [[ ${#files[@]} -gt 0 ]] || return 0
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$json_path" "${files[@]}" <<'PY'
+import json, sys
+from pathlib import Path
+
+json_path = Path(sys.argv[1])
+with json_path.open() as fh:
+    data = json.load(fh)
+extras = data.get("extras", {})
+for raw in sys.argv[2:]:
+    path = Path(raw)
+    try:
+        payload = json.loads(path.read_text())
+    except Exception:
+        continue
+    if isinstance(payload, dict):
+        extras.update(payload)
+if extras:
+    data["extras"] = extras
+    json_path.write_text(json.dumps(data))
+PY
+  else
+    :
+  fi
 }
 
 minimal_sarif_from_text(){
