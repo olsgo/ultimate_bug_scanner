@@ -336,6 +336,9 @@ parse_text_to_json(){
   warning=$(printf '%s\n' "$cleaned" | grep -E 'Warning issues:|Warning' | grep -Eo '[0-9]+' | tail -n1 || true)
   info=$(printf '%s\n' "$cleaned" | grep -E 'Info items:|Info' | grep -Eo '[0-9]+' | tail -n1 || true)
   files=$(printf '%s\n' "$cleaned" | grep -E 'Files scanned:' | grep -Eo '[0-9]+' | tail -n1 || true)
+  if [[ -z "$files" ]]; then
+    files=$(printf '%s\n' "$cleaned" | grep -E 'Files:[[:space:]]*[0-9]+' | grep 'source files' | grep -Eo '[0-9]+' | head -n1 || true)
+  fi
   critical=${critical:-0}; warning=${warning:-0}; info=${info:-0}; files=${files:-0}
   cat >"$json" <<JSON
 {"language":"$lang","project":"$PROJECT_DIR","files":$files,"critical":$critical,"warning":$warning,"info":$info,"timestamp":"$(date_iso)"}
