@@ -40,6 +40,12 @@ uv run python test-suite/run_manifest.py --case js-core-buggy
 
 > ℹ️ Shell scripts that invoke `python3` (language modules under `modules/`, `test-suite/run_all.sh`, etc.) automatically pick up `.venv/bin/python3` as long as the environment is activated or `.venv/bin` is on your `PATH`. The pinned `pyproject.toml` + `uv.lock` are the single source of truth for this toolchain.
 
+Common uv-powered entrypoints:
+
+- `uv run python test-suite/run_manifest.py --case js-core-buggy` – run the manifest in CI or locally without manually activating the venv.
+- `source .venv/bin/activate && python -m pip list` – verify that every inline `python3` invocation maps to CPython 3.13.
+- `uv run python - <<'PY' …` – mirrors how the language modules embed Python helpers, but now guaranteed to execute inside the managed interpreter.
+
 ---
 
 ## 💥 **The Problem: AI Moves Fast, Bugs Move Faster**

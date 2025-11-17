@@ -93,6 +93,8 @@ uv run python test-suite/run_manifest.py --case js-core-buggy
 
 All subsequent examples below assume that `.venv/bin` is on your `PATH` so `python`/`python3` resolve to that managed interpreter.
 
+> Tip: `test-suite/run_all.sh` automatically prefers `uv run python …` and falls back to `python3` only if `uv` is unavailable, so CI and local runs stay on CPython 3.13 without extra flags.
+
 ### Scan Individual Buggy Files
 
 ```bash
