@@ -873,7 +873,7 @@
     {
       "id": "java-resource-lifecycle",
       "description": "Java ExecutorService shutdown regression.",
-      "path": "test-suite/java/buggy/ResourceLifecycle.java",
+      "path": "test-suite/java/buggy",
       "language": "java",
       "tags": [
         "java",
@@ -892,7 +892,7 @@
           }
         },
         "require_substrings": [
-          "ResourceLifecycle.java"
+          "ExecutorService created without shutdown"
         ]
       }
     },
