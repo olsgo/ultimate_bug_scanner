@@ -2150,9 +2150,3 @@ helpers/
    - Good: "Object in deps changes every render → effect triggers → state updates → re-render → loop"
 
 ---
-
-**This document represents the next evolution of UBS:** From pattern matching to semantic understanding. From detection to explanation. From static analysis to **intelligent correlation**.
-
-The future is ast-grep-powered, correlation-aware, consequence-explaining bug analysis.
-
-Let's build it. 🚀
