@@ -99,6 +99,27 @@ declare -A ASYNC_ERROR_SEVERITY=(
   [py.async.task-no-await]='warning'
 )
 
+# Taint analysis metadata
+TAINT_RULE_IDS=(py.taint.xss py.taint.sql py.taint.command py.taint.eval)
+declare -A TAINT_SUMMARY=(
+  [py.taint.xss]='Unsanitized request data reaches HTML/response sinks'
+  [py.taint.sql]='User input flows into SQL execute() without parameters'
+  [py.taint.command]='User input reaches subprocess/os.system'
+  [py.taint.eval]='User input flows into eval/exec'
+)
+declare -A TAINT_REMEDIATION=(
+  [py.taint.xss]='Escape or sanitize template context (html.escape, mark_safe only on trusted data)'
+  [py.taint.sql]='Use parameterized queries (cursor.execute(sql, params)) or ORM query bindings'
+  [py.taint.command]='Use shlex.quote or pass args list with shell=False'
+  [py.taint.eval]='Avoid eval/exec on user input; whitelist actions explicitly'
+)
+declare -A TAINT_SEVERITY=(
+  [py.taint.xss]='critical'
+  [py.taint.sql]='critical'
+  [py.taint.command]='critical'
+  [py.taint.eval]='critical'
+)
+
 print_usage() {
   cat >&2 <<USAGE
 Usage: $(basename "$0") [options] [PROJECT_DIR] [OUTPUT_FILE]
@@ -444,6 +465,224 @@ PY
     print_finding "good" "All async operations appear protected"
   fi
 }
+
+run_taint_analysis_checks() {
+  print_subheader "Lightweight taint analysis"
+  if ! command -v python3 >/dev/null 2>&1; then
+    print_finding "info" 0 "python3 not available" "Install python3 to enable taint flow checks"
+    return
+  fi
+  local printed=0
+  while IFS=$'\t' read -r rule_id count samples; do
+    [[ -z "$rule_id" ]] && continue
+    printed=1
+    local severity=${TAINT_SEVERITY[$rule_id]:-warning}
+    local summary=${TAINT_SUMMARY[$rule_id]:-$rule_id}
+    local desc=${TAINT_REMEDIATION[$rule_id]:-"Sanitize user input before reaching this sink"}
+    if [[ -n "$samples" ]]; then
+      desc+=" (e.g., $samples)"
+    fi
+    print_finding "$severity" "$count" "$summary" "$desc"
+  done < <(python3 - "$PROJECT_DIR" <<'PY'
+import re, sys
+from collections import defaultdict
+from pathlib import Path
+
+ROOT = Path(sys.argv[1]).resolve()
+BASE_DIR = ROOT if ROOT.is_dir() else ROOT.parent
+SKIP_DIRS = {'.git', '.venv', '__pycache__', 'node_modules', '.mypy_cache', '.pytest_cache', '.cache', 'build', 'dist'}
+EXTS = {'.py', '.pyi'}
+PATH_LIMIT = 5
+
+SOURCE_PATTERNS = [
+    re.compile(r"request\.(?:args|get_json|json|form|values|data|body|GET|POST)", re.IGNORECASE),
+    re.compile(r"flask\.request", re.IGNORECASE),
+    re.compile(r"django\.http\.request", re.IGNORECASE),
+    re.compile(r"input\s*\(", re.IGNORECASE),
+    re.compile(r"raw_input\s*\(", re.IGNORECASE),
+    re.compile(r"sys\.argv", re.IGNORECASE),
+    re.compile(r"os\.environ", re.IGNORECASE),
+    re.compile(r"event\['body'\]", re.IGNORECASE),
+    re.compile(r"params\[[^\]]+\]", re.IGNORECASE),
+]
+
+SANITIZER_REGEXES = [
+    re.compile(r"html\.escape"),
+    re.compile(r"django\.utils\.html\.escape"),
+    re.compile(r"flask\.escape"),
+    re.compile(r"mark_safe"),
+    re.compile(r"bleach\.clean"),
+    re.compile(r"shlex\.quote"),
+    re.compile(r"urllib\.parse\.quote"),
+]
+
+SINKS = [
+    (re.compile(r"render_template(?:_string)?\s*\((.+)\)"), 'py.taint.xss', 'render_template'),
+    (re.compile(r"HttpResponse\((.+)\)"), 'py.taint.xss', 'HttpResponse'),
+    (re.compile(r"Response\((.+)\)"), 'py.taint.xss', 'Flask Response'),
+    (re.compile(r"(?:cursor|session|conn)\.(?:execute|executemany)\s*\((.+)\)"), 'py.taint.sql', 'SQL execute'),
+    (re.compile(r"(?:engine|db)\.(?:execute|text)\s*\((.+)\)"), 'py.taint.sql', 'SQL engine execute'),
+    (re.compile(r"subprocess\.(?:run|Popen|call|check_output|check_call)\s*\((.+)\)"), 'py.taint.command', 'subprocess execution'),
+    (re.compile(r"os\.(?:system|popen|execv)\s*\((.+)\)"), 'py.taint.command', 'os command execution'),
+    (re.compile(r"eval\s*\((.+)\)"), 'py.taint.eval', 'eval'),
+    (re.compile(r"exec\s*\((.+)\)"), 'py.taint.eval', 'exec'),
+]
+
+ASSIGN_SIMPLE = re.compile(r"^(?P<targets>[A-Za-z_][\w]*(?:\s*,\s*[A-Za-z_][\w]*)*)\s*=\s*(?P<expr>.+)")
+
+
+def should_skip(path: Path) -> bool:
+    return any(part in SKIP_DIRS for part in path.parts)
+
+
+def iter_files(root: Path):
+    if root.is_file():
+        if root.suffix.lower() in EXTS:
+            yield root
+        return
+    for path in root.rglob('*'):
+        if not path.is_file():
+            continue
+        if should_skip(path):
+            continue
+        if path.suffix.lower() in EXTS:
+            yield path
+
+
+def strip_comments(line: str) -> str:
+    if '#' in line:
+        idx = line.find('#')
+        if idx >= 0:
+            line = line[:idx]
+    return line
+
+
+def parse_assignments(lines):
+    assignments = []
+    for idx, raw in enumerate(lines, start=1):
+        line = strip_comments(raw).strip()
+        if not line or '=' not in line:
+            continue
+        if '==' in line or '>=' in line or '<=' in line or '!=' in line:
+            continue
+        match = ASSIGN_SIMPLE.match(line)
+        if not match:
+            continue
+        lhs = match.group('targets')
+        expr = match.group('expr')
+        for target in [t.strip() for t in lhs.split(',') if t.strip()]:
+            assignments.append((idx, target, expr))
+    return assignments
+
+
+def find_sources(expr: str):
+    matches = []
+    for regex in SOURCE_PATTERNS:
+        for m in regex.finditer(expr):
+            matches.append(m.group(0))
+    return matches
+
+
+def expr_has_sanitizer(expr: str, sink_rule: str | None = None) -> bool:
+    expr_lower = expr.lower()
+    for regex in SANITIZER_REGEXES:
+        if regex.search(expr_lower):
+            return True
+    if sink_rule == 'py.taint.sql' and re.search(r",\s*(?:\(|\[|params|data|values|bindings)", expr_lower):
+        return True
+    return False
+
+
+def expr_has_tainted(expr: str, tainted):
+    for name, meta in tainted.items():
+        pattern = rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])"
+        if re.search(pattern, expr):
+            return name, meta
+    return None, None
+
+
+def record_taint(assignments):
+    tainted = {}
+    for line_no, target, expr in assignments:
+        if expr_has_sanitizer(expr, None):
+            continue
+        sources = find_sources(expr)
+        if sources:
+            tainted[target] = {'source': sources[0], 'line': line_no, 'path': [sources[0], target]}
+    for _ in range(5):
+        changed = False
+        for line_no, target, expr in assignments:
+            if target in tainted or expr_has_sanitizer(expr, None):
+                continue
+            ref, meta = expr_has_tainted(expr, tainted)
+            if ref:
+                new_path = list(meta.get('path', [ref]))
+                if len(new_path) >= PATH_LIMIT:
+                    new_path = new_path[-(PATH_LIMIT-1):]
+                new_path.append(target)
+                tainted[target] = {'source': meta.get('source', ref), 'line': line_no, 'path': new_path}
+                changed = True
+        if not changed:
+            break
+    return tainted
+
+
+def analyze_file(path: Path, issues):
+    try:
+        text = path.read_text(encoding='utf-8')
+    except (UnicodeDecodeError, OSError):
+        return
+    lines = text.splitlines()
+    assignments = parse_assignments(lines)
+    tainted = record_taint(assignments)
+    for idx, raw in enumerate(lines, start=1):
+        stripped = strip_comments(raw)
+        if not stripped:
+            continue
+        for regex, rule, label in SINKS:
+            match = regex.search(stripped)
+            if not match:
+                continue
+            expr = match.group(1)
+            if not expr or expr_has_sanitizer(expr, rule):
+                continue
+            direct = find_sources(expr)
+            if direct:
+                path_desc = f"{direct[0]} -> {label}"
+            else:
+                ref, meta = expr_has_tainted(expr, tainted)
+                if not ref:
+                    continue
+                seq = list(meta.get('path', [ref]))
+                if len(seq) >= PATH_LIMIT:
+                    seq = seq[-(PATH_LIMIT-1):]
+                seq.append(label)
+                path_desc = ' -> '.join(seq)
+            try:
+                rel = path.relative_to(BASE_DIR)
+            except ValueError:
+                rel = path.name
+            sample = f"{rel}:{idx} {path_desc}"
+            bucket = issues[rule]
+            bucket['count'] += 1
+            if len(bucket['samples']) < 3:
+                bucket['samples'].append(sample)
+
+
+issues = defaultdict(lambda: {'count': 0, 'samples': []})
+for file_path in iter_files(ROOT):
+    analyze_file(file_path, issues)
+
+for rule_id, data in issues.items():
+    samples = ','.join(data['samples'])
+    print(f"{rule_id}\t{data['count']}\t{samples}")
+PY
+)
+  if [[ $printed -eq 0 ]]; then
+    print_finding "good" "No tainted sources reach dangerous sinks"
+  fi
+}
+
 
 show_ast_samples_from_json() {
   local blob=$1
@@ -1487,6 +1726,8 @@ fi
 print_subheader "tempfile.mktemp (insecure)"
 count=$("${GREP_RN[@]}" -e "tempfile\.mktemp\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true)
 if [ "$count" -gt 0 ]; then print_finding "critical" "$count" "Insecure tempfile.mktemp usage" "Use NamedTemporaryFile/mkstemp"; fi
+
+run_taint_analysis_checks
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
