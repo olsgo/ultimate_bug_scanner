@@ -122,6 +122,30 @@ release_lock() {
   fi
 }
 
+acquire_lock() {
+  if command -v flock >/dev/null 2>&1; then
+    LOCK_METHOD="flock"
+    exec {LOCK_FD}> "$LOCK_FILE"
+    if flock -n "$LOCK_FD"; then
+      LOCK_OWNED=1
+      return 0
+    else
+      error "Another installation is already in progress."
+      error "If this is incorrect, delete $LOCK_FILE and retry."
+      exit 1
+    fi
+  fi
+
+  LOCK_METHOD="dir"
+  if mkdir "$LOCK_FILE" 2>/dev/null; then
+    LOCK_OWNED=1
+  else
+    error "Another installation is already in progress."
+    error "If this is incorrect, delete $LOCK_FILE and retry."
+    exit 1
+  fi
+}
+
 # Set up cleanup traps
 trap 'cleanup_on_exit; exit 130' INT   # 130 = 128 + SIGINT (2)
 trap 'cleanup_on_exit; exit 143' TERM  # 143 = 128 + SIGTERM (15)
@@ -1991,12 +2015,7 @@ main() {
 
 # Concurrent execution lock to prevent race conditions
 
-if ! mkdir "$LOCK_FILE" 2>/dev/null; then
-error "Another installation is already in progress"
-error "If this is incorrect, remove: $LOCK_FILE"
-exit 1
-fi
-LOCK_OWNED=1
+acquire_lock
 
 # Save original arguments for potential re-exec during update
 
