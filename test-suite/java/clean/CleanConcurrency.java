@@ -7,7 +7,8 @@ import java.util.concurrent.Executors;
 
 public class CleanConcurrency {
     public void submitTasks(List<Callable<Void>> tasks) throws InterruptedException, ExecutionException {
-        try (ExecutorService exec = Executors.newFixedThreadPool(4)) {
+        ExecutorService exec = Executors.newFixedThreadPool(4);
+        try {
             exec.invokeAll(new ArrayList<>(tasks)).forEach(future -> {
                 try {
                     future.get();
@@ -15,6 +16,8 @@ public class CleanConcurrency {
                     throw new RuntimeException(e);
                 }
             });
+        } finally {
+            exec.shutdown();
         }
     }
 }
