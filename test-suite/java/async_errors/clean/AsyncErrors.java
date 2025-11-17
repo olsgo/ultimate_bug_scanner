@@ -3,11 +3,12 @@ import java.util.concurrent.CompletableFuture;
 public class AsyncErrors {
     public static String loadUser() {
         CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> "user");
-        try {
-            return future.get();
-        } catch (Exception ex) {
-            throw new IllegalStateException("failed", ex);
-        }
+        return future.handle((result, err) -> {
+            if (err != null) {
+                throw new IllegalStateException("failed", err);
+            }
+            return result;
+        }).join();
     }
 
     public static void logChain() {

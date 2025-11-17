@@ -186,7 +186,6 @@
       ],
       "args": [
         "--only=js",
-        "--skip=6",
         "--fail-on-warning"
       ],
       "expect": {
@@ -212,8 +211,7 @@
         "clean"
       ],
       "args": [
-        "--only=js",
-        "--skip=6"
+        "--only=js"
       ],
       "expect": {
         "exit_code": "zero",
