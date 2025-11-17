@@ -12,7 +12,7 @@ async fn run() {
     let handle = tokio::spawn(async move {
         let _ = fetch_data().await;
     });
-    println!("spawned: {:?}", handle.abort());
+    println!("spawned: {:?}", handle);
 }
 
 fn main() {
@@ -23,6 +23,12 @@ mod tokio {
     use super::*;
 
     pub struct JoinHandle;
+
+    impl std::fmt::Debug for JoinHandle {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("JoinHandle")
+        }
+    }
 
     impl Future for JoinHandle {
         type Output = Result<(), ()>;

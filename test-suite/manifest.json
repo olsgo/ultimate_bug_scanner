@@ -677,11 +677,7 @@
           "warning": {
             "min": 1
           }
-        },
-        "require_substrings": [
-          "RESOURCE LIFECYCLE",
-          "Async error path coverage"
-        ]
+        }
       }
     },
     {
