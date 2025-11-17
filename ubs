@@ -40,6 +40,8 @@ FAIL_ON_WARNING=0
 VERBOSE=0
 ONLY_LANGS=""              # csv: js,python,cpp,rust
 EXCLUDE_LANGS=""           # csv
+IGNORE_FILE=""
+GLOBAL_EXCLUDE_PATTERNS=""
 MODULE_DIR_DEFAULT="${XDG_DATA_HOME:-$HOME/.local/share}/ubs/modules"
 MODULE_DIR="$MODULE_DIR_DEFAULT"
 UPDATE_MODULES=0
@@ -59,6 +61,7 @@ Options:
   --module-dir=DIR        Where to store/lookup modules (default: $MODULE_DIR_DEFAULT)
   --update-modules        Force re-download of modules before run
   --jobs=N                Parallelism hint (passed to children if supported)
+  --ignore-file=PATH      Read additional ignore globs (default: PROJECT/.ubsignore if present)
   -h, --help              Show this help
 
 Examples:
@@ -76,6 +79,7 @@ while [[ $# -gt 0 ]]; do
     -v|--verbose) VERBOSE=1; shift;;
     --only=*) ONLY_LANGS="${1#*=}"; shift;;
     --exclude=*) EXCLUDE_LANGS="${1#*=}"; shift;;
+    --ignore-file=*) IGNORE_FILE="${1#*=}"; shift;;
     --module-dir=*) MODULE_DIR="${1#*=}"; shift;;
     --update-modules) UPDATE_MODULES=1; shift;;
     --jobs=*) JOBS="${1#*=}"; shift;;
@@ -101,6 +105,44 @@ prepare_metrics_dir(){
   rm -rf "$dir" 2>/dev/null || true
   mkdir -p "$dir" 2>/dev/null || true
 }
+
+load_ignore_patterns(){
+  local file="$1"
+  [[ -f "$file" ]] || return
+  if ! need_cmd python3; then
+    say "${YELLOW}${WARN}${RESET} python3 is required to parse ignore file $file (skipping)"
+    return
+  fi
+  local csv
+  csv=$(python3 - "$file" <<'PY' 2>/dev/null
+import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+if not path.exists():
+    sys.exit(0)
+patterns = []
+for raw in path.read_text().splitlines():
+    stripped = raw.strip()
+    if not stripped or stripped.startswith('#'):
+        continue
+    patterns.append(stripped)
+print(",".join(patterns))
+PY
+)
+  csv="${csv//$'\n'/}"
+  csv="${csv%,}"
+  if [[ -n "$csv" ]]; then
+    GLOBAL_EXCLUDE_PATTERNS="$csv"
+    local human="${csv//,/ }"
+    say "${DIM}${INFO}${RESET} Ignoring paths from ${file} → ${human}"
+  fi
+}
+
+if [[ -z "$IGNORE_FILE" && -f "$PROJECT_DIR/.ubsignore" ]]; then
+  IGNORE_FILE="$PROJECT_DIR/.ubsignore"
+fi
+if [[ -n "$IGNORE_FILE" ]]; then
+  load_ignore_patterns "$IGNORE_FILE"
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Language catalog
@@ -271,6 +313,7 @@ run_lang(){
   [[ "$FAIL_ON_WARNING" -eq 1 ]] && args+=("--fail-on-warning")
   [[ "$VERBOSE" -eq 1 ]] && args+=('-v')
   [[ "$JOBS" -gt 0 ]] && args+=("--jobs=$JOBS")
+  [[ -n "$GLOBAL_EXCLUDE_PATTERNS" ]] && args+=("--exclude=$GLOBAL_EXCLUDE_PATTERNS")
 
   case "$fmt" in
     json)

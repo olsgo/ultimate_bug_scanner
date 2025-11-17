@@ -1,0 +1,5 @@
+## Ultimate Bug Scanner ignore list
+# Paths/globs listed here are skipped by `./ubs` (similar to .gitignore semantics).
+# Useful for excluding intentionally buggy fixtures, generated assets, or vendor dirs.
+
+test-suite/
