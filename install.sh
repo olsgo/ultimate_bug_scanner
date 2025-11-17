@@ -62,7 +62,7 @@ cleanup_on_exit() {
   rm -rf /tmp/ripgrep.tar.gz /tmp/ripgrep-* /tmp/ast-grep.zip /tmp/ast-grep 2>/dev/null
   # Remove lock file ONLY if we created it (don't remove another process's lock!)
   if [ "$LOCK_OWNED" -eq 1 ]; then
-    rmdir "$LOCK_FILE" 2>/dev/null
+    rmdir "$LOCK_FILE" 2>/dev/null || true  # || true prevents set -e from killing cleanup
     LOCK_OWNED=0  # Mark that we no longer own it (prevents double-remove in EXIT trap)
   fi
 }
@@ -440,7 +440,7 @@ check_for_updates() {
         # (If signal arrives after rmdir but before LOCK_OWNED=0, trap would try to
         #  remove lock that might have been acquired by another process!)
         LOCK_OWNED=0  # Mark that we no longer own the lock
-        rmdir "$LOCK_FILE" 2>/dev/null  # Remove it
+        rmdir "$LOCK_FILE" 2>/dev/null || true  # Remove it (|| true prevents set -e from aborting)
         exec bash <(curl -fsSL "$REPO_URL/install.sh") "${ORIGINAL_ARGS[@]}"
         # If we get here, exec failed - abort immediately (we no longer have the lock!)
         error "Failed to download or execute updated installer"
