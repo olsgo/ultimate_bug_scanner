@@ -9,3 +9,4 @@ dependencies = []
 
 [tool.uv]
 managed = true
+python-preference = "only-managed"
