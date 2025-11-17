@@ -374,24 +374,41 @@ run_resource_lifecycle_checks() {
 
 run_async_error_checks() {
   print_subheader "Async error path coverage"
-  local files has_issues=0
+  local files
   files=$("${GREP_RN[@]}" -e "tokio::spawn" "$PROJECT_DIR" 2>/dev/null | cut -d: -f1 | sort -u || true)
   if [[ -z "$files" ]]; then
     print_finding "good" "No tokio::spawn usage detected"
     return
   fi
-  while IFS= read -r file; do
+  local issues=0
+  while IFS=$'
+' read -r file; do
     [[ -z "$file" ]] && continue
-    local await_hits abort_hits
-    await_hits=$("${GREP_RN[@]}" -e "\.await" "$file" 2>/dev/null | count_lines || true)
-    abort_hits=$("${GREP_RN[@]}" -e "\.abort" "$file" 2>/dev/null | count_lines || true)
-    if (( await_hits == 0 && abort_hits == 0 )); then
-      has_issues=1
+    local missing
+    missing=$(python3 - "$file" <<'PY2'
+import sys, re
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+names = re.findall(r'let\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*tokio::spawn', text)
+missing = []
+for name in names:
+    patt_await = re.compile(rf"{name}\.await")
+    patt_abort = re.compile(rf"{name}\.abort")
+    if patt_await.search(text) or patt_abort.search(text):
+        continue
+    missing.append(name)
+if missing:
+    print(','.join(missing))
+PY2
+)
+    if [[ -n "$missing" ]]; then
+      issues=1
       local rel="${file#"$PROJECT_DIR"/}"
       print_finding "warning" 1 "tokio::spawn JoinHandle dropped" "Await or abort JoinHandles returned by tokio::spawn ($rel)"
     fi
   done <<<"$files"
-  if [[ $has_issues -eq 0 ]]; then
+  if [[ $issues -eq 0 ]]; then
     print_finding "good" "tokio::spawn handles appear awaited"
   fi
 }
@@ -1100,6 +1117,8 @@ if [ "$dbg_count" -gt 0 ]; then print_finding "info" "$dbg_count" "dbg! macros p
 if [ "$pln_count" -gt 0 ]; then print_finding "info" "$pln_count" "println! found - prefer logging"; fi
 if [ "$epln_count" -gt 0 ]; then print_finding "info" "$epln_count" "eprintln! found - prefer logging"; fi
 fi
+fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CATEGORY 2: UNSAFE & MEMORY OPERATIONS
@@ -1362,6 +1381,9 @@ print_header "12. LINTS & STYLE (fmt/clippy)"
 print_category "Runs: cargo fmt -- --check, cargo clippy" \
   "Formatter and lints help maintain consistent style and catch many issues"
 
+if [[ -n "${UBS_SKIP_RUST_BUILD:-}" ]]; then
+print_finding "info" 0 "Skipped via UBS_SKIP_RUST_BUILD"
+else
 FMT_LOG="$(mktemp)"; CLIPPY_LOG="$(mktemp)"; TMP_FILES+=("$FMT_LOG" "$CLIPPY_LOG")
 if [[ "$RUN_CARGO" -eq 1 && "$HAS_CARGO" -eq 1 ]]; then
   # cargo fmt -- --check
@@ -1402,6 +1424,9 @@ print_header "13. BUILD HEALTH (check/test)"
 print_category "Runs: cargo check, cargo test --no-run" \
   "Ensures the project compiles and tests build"
 
+if [[ -n "${UBS_SKIP_RUST_BUILD:-}" ]]; then
+print_finding "info" 0 "Skipped via UBS_SKIP_RUST_BUILD"
+else
 CHECK_LOG="$(mktemp)"; TEST_LOG="$(mktemp)"; TMP_FILES+=("$CHECK_LOG" "$TEST_LOG")
 if [[ "$RUN_CARGO" -eq 1 && "$HAS_CARGO" -eq 1 ]]; then
   run_cargo_subcmd "check" "$CHECK_LOG" bash -lc "cd \"$PROJECT_DIR\" && CARGO_TERM_COLOR=${CARGO_TERM_COLOR:-auto} cargo check"
