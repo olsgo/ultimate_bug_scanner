@@ -193,6 +193,8 @@ Each file contains **intentional bugs** that the scanner should detect:
 | `js-taint-clean` | `test-suite/js/clean/taint_analysis.js` | Mirrors the buggy flows but sanitizes with DOMPurify/escapeHtml/shellescape/parameterized SQL to prove the helper suppresses safe code. |
 | `python-taint-buggy` | `test-suite/python/buggy/taint_analysis.py` | Flask `request.args` hits HTML, `cursor.execute`, and `subprocess.run(shell=True)` without sanitization so new helper must warn. |
 | `python-taint-clean` | `test-suite/python/clean/taint_analysis.py` | Same flows but escaped via `html.escape`, parameterized SQL, and `shlex.quote`, proving the helper stays quiet on safe code. |
+| `golang-taint-buggy` | `test-suite/golang/buggy/taint_analysis.go` | `r.FormValue` is written to `fmt.Fprintf`, concatenated into SQL, and passed to `exec.Command("sh","-c", ...)`. |
+| `golang-taint-clean` | `test-suite/golang/clean/taint_analysis.go` | Escapes comments with `html.EscapeString`, uses positional args in `db.Exec`, and passes cleaned paths into `exec.Command`. |
 
 ### Realistic Scenarios
 
