@@ -25,6 +25,7 @@ declare -A MODULE_CHECKSUMS=(
   [golang]='1ffde3581adc85ea70d4287ae6b9c3e2edd8256aa9af8ada36e303ef7e00cf8f'
   [java]='af71e11a018dcffce9a260d94f04fa17d94ba008e5deac5d12ac29aef55002b4'
   [ruby]='b147852bf853d28442cdefd9f638830e5e6a676f473b7bb9d85b44869d31dfea'
+  [swift]='1fa406bf879df6bc1a159263841d2af758d03da6453a922cbc42b40e87535115'
 )
 
 # Colors (respect NO_COLOR or non-tty)
@@ -102,7 +103,7 @@ SESSION_ENTRIES=1
 SESSION_RAW=0
 SESSION_LOG_DIR_OVERRIDE=""
 VERIFY_MODULE_ERR=""
-ALL_LANGS=(js python cpp rust golang java ruby)
+ALL_LANGS=(js python cpp rust golang java ruby swift)
 CATEGORY_FILTER=""
 COMPARISON_FILE=""
 REPORT_JSON_PATH=""
@@ -133,7 +134,7 @@ Options:
   --ci                    CI mode (stable timestamps)
   --fail-on-warning       Exit non-zero if warnings or critical exist
   -v, --verbose           Pass -v to child scanners (if supported)
-  --only=CSV              Restrict to languages: js,python,cpp,rust,golang,java,ruby
+  --only=CSV              Restrict to languages: js,python,cpp,rust,golang,java,ruby,swift
   --exclude=CSV           Exclude languages
   --module-dir=DIR        Where to store/lookup modules (default: $MODULE_DIR_DEFAULT)
   --category=CSV          Focus on category packs (e.g., resource-lifecycle for AST lifecycle analyzers)
@@ -720,10 +721,10 @@ detect_lang(){
     java)
       if need_cmd rg; then
         rg -q --hidden -g '!target/**' -g '!build/**' -g '!out/**' -g '!dist/**' \
-           -g '*.java' -g '*.kt' -g '*.kts' -g '*.swift' -g 'pom.xml' -g 'build.gradle' -g 'build.gradle.kts' -g 'settings.gradle' -g 'settings.gradle.kts' -g 'gradlew' -g 'mvnw' . "$PROJECT_DIR" 2>/dev/null && found=0
+           -g '*.java' -g '*.kt' -g '*.kts' -g 'pom.xml' -g 'build.gradle' -g 'build.gradle.kts' -g 'settings.gradle' -g 'settings.gradle.kts' -g 'gradlew' -g 'mvnw' . "$PROJECT_DIR" 2>/dev/null && found=0
       else
         find "$PROJECT_DIR" \( -name target -o -name build -o -name out -o -name dist -o -name .git \) -prune -o \
-          -type f \( -name '*.java' -o -name '*.kt' -o -name '*.kts' -o -name '*.swift' -o -name 'pom.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' -o -name 'gradlew' -o -name 'mvnw' \) -print -quit 2>/dev/null | grep -q . && found=0
+          -type f \( -name '*.java' -o -name '*.kt' -o -name '*.kts' -o -name 'pom.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' -o -name 'gradlew' -o -name 'mvnw' \) -print -quit 2>/dev/null | grep -q . && found=0
       fi
       ;;
     ruby)
@@ -733,6 +734,15 @@ detect_lang(){
       else
         find "$PROJECT_DIR" \( -name vendor -o -name bundle -o -name tmp -o -name dist -o -name .git \) -prune -o \
           -type f \( -name '*.rb' -o -name 'Gemfile' -o -name 'Gemfile.lock' -o -name '*.gemspec' -o -name 'Rakefile' \) -print -quit 2>/dev/null | grep -q . && found=0
+      fi
+      ;;
+    swift)
+      if need_cmd rg; then
+        rg -q --hidden -g '!DerivedData/**' -g '!build/**' -g '!buck-out/**' -g '!dist/**' \
+           -g '*.swift' -g '*.metal' -g 'Package.swift' -g '*.xcodeproj/project.pbxproj' -g '*.xcworkspace/contents.xcworkspacedata' . "$PROJECT_DIR" 2>/dev/null && found=0
+      else
+        find "$PROJECT_DIR" \( -name DerivedData -o -name build -o -name buck-out -o -name dist -o -name .git \) -prune -o \
+          -type f \( -name '*.swift' -o -name '*.metal' -o -name 'Package.swift' -o -name '*.xcodeproj' -o -name '*.xcworkspace' \) -print -quit 2>/dev/null | grep -q . && found=0
       fi
       ;;
   esac
