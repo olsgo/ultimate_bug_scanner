@@ -91,18 +91,18 @@ _Updated: 2025-11-18 01:30 UTC_
 - [ ] Summarize findings + scanner results in final handoff.
 
 ### 8. Instant Confidence Onboarding (ir4)
-- [ ] Capture readiness facts (ripgrep/jq/typos/type narrowing) during installer run and feed into session summary bullet list.
-- [ ] Include last `ubs doctor` exit status + pointer to session log path in completion banner.
-- [ ] Implement `ubs sessions` (or `ubs session-log`) subcommand:
-  - [ ] Show tail of `~/.config/ubs/session.md` with optional `--entries`/`--raw` flags.
-  - [ ] Respect `NO_COLOR` and provide helpful error if log absent.
-- [ ] Installer: mention new CLI command in quickstart text + README.
-- [ ] Test: extend `test-suite/install/run_tests.sh` to stub HOME, run installer with `--skip-doctor` false, then assert `ubs sessions --entries 1` prints latest block without error (maybe by invoking CLI script with env pointing to temp config).
+- [x] Capture readiness facts (ripgrep/jq/typos/type narrowing) during installer run and feed into session summary bullet list.
+- [x] Include last `ubs doctor` exit status + pointer to session log path in completion banner.
+- [x] Implement `ubs sessions` (or `ubs session-log`) subcommand:
+  - [x] Show tail of `~/.config/ubs/session.md` with optional `--entries`/`--raw` flags.
+  - [x] Respect `NO_COLOR` and provide helpful error if log absent.
+- [x] Installer: mention new CLI command in quickstart text + README.
+- [x] Test: extend `test-suite/install/run_tests.sh` to stub HOME, run installer with `--skip-doctor` false, then assert `ubs sessions --entries 1` prints latest block without error (maybe by invoking CLI script with env pointing to temp config).
 
 ### 9. Type Narrowing Full Coverage (4se)
-- [ ] Kotlin helper: add coroutine context awareness (e.g., guard `if (job != null)` before `job!!`).
-- [ ] Swift helper: detect optional chaining misuse (guard `if foo?.bar != nil` then later `foo!.bar`), and bridging cases.
-- [ ] Add fixtures under `test-suite/kotlin/type_narrowing/` and `test-suite/swift/type_narrowing/` for new heuristics; update manifest counts accordingly.
-- [ ] README/test-suite docs: new Swift/Kotlin coverage table row plus CLI flag mention.
-- [ ] UBS CLI help text: mention cross-language coverage + `--skip-type-narrowing` effects (ensuring help section includes languages).
-- [ ] Tests: run targeted manifest cases + `test-suite/run_all.sh` to verify metrics.
+- [x] Kotlin helper: add coroutine/optional-chain awareness (e.g., guard `if (job?.isActive == true)` before `job!!`).
+- [x] Swift helper: detect optional chaining misuse (guard `if foo?.bar != nil` then later `foo!.bar`), and bridging cases.
+- [x] Add fixtures under `test-suite/kotlin/type_narrowing/` and `test-suite/swift/type_narrowing/` for new heuristics; update manifest counts accordingly.
+- [x] README/test-suite docs: new Swift/Kotlin coverage table row plus CLI flag mention.
+- [x] UBS CLI help text: mention cross-language coverage + `--skip-type-narrowing` effects (ensuring help section includes languages).
+- [x] Tests: run targeted manifest cases + `test-suite/run_all.sh` to verify metrics.
