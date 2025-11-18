@@ -3,3 +3,4 @@
 # Useful for excluding intentionally buggy fixtures, generated assets, or vendor dirs.
 
 test-suite/
+modules/helpers/*.go
