@@ -12,7 +12,7 @@
 
 ```bash
 # One command to catch 1000+ bug patterns
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash
 ```
 
 </div>
@@ -1049,7 +1049,7 @@ Detects: Missing await, unhandled rejections, race conditions
 ### **Option 1: Automated Install (Recommended)**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash
 ```
 
 The installer will:
@@ -1070,7 +1070,7 @@ Need to revisit what the installer discovered later? Run `ubs sessions --entries
 Need the “just make it work” button? Run the installer with `--easy-mode` to auto-install every dependency, accept all prompts, detect local coding agents, and wire their quality guardrails with zero extra questions:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh \
   | bash -s -- --easy-mode
 ```
 
@@ -1082,7 +1082,7 @@ Need to keep your shell RC files untouched? Combine `--no-path-modify` (and opti
 
 ```bash
 # Download and install the unified runner
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/ubs \
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/ubs \
   -o /usr/local/bin/ubs && chmod +x /usr/local/bin/ubs
 
 # Verify it works
@@ -1099,7 +1099,7 @@ npm install -g typescript        # Enables full tsserver-based type narrowing ch
 
 ```bash
 # Download once
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/ubs \
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/ubs \
   -o ubs && chmod +x ubs
 
 # Run it
@@ -1296,7 +1296,7 @@ jobs:
 
       - name: Install Bug Scanner
         run: |
-          curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash -s -- --non-interactive
+          curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash -s -- --non-interactive
 
       - name: Scan for Bugs
         run: |
@@ -1387,7 +1387,7 @@ Critical issues found? ────┤ YES
 
 > Copy to `AGENTS.md` or `.cursorrules` for integration guidance.
 
-**Install:** `curl -sSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash`
+**Install:** `curl -sSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash`
 
 **Golden Rule:** `./ubs <changed-files>` before every commit. Exit 0 = safe. Exit >0 = fix & re-run.
 
@@ -1859,7 +1859,7 @@ The Ultimate Bug Scanner gives you:
 ### **One Command. Three Seconds. Zero Production Bugs.**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash
 ```
 
 **Then never waste another evening debugging a null pointer exception.**

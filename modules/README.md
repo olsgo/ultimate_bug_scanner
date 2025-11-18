@@ -26,5 +26,5 @@ Modules are auto-downloaded by the `ubs` meta-runner with this priority:
 3. Cached modules under `${XDG_DATA_HOME:-$HOME/.local/share}/ubs/modules`
 
 When a module is missing, `ubs` fetches it from
-`https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/modules/ubs-<lang>.sh`,
+`https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/modules/ubs-<lang>.sh`,
 validates the shebang, marks it executable, and caches it for future runs.
