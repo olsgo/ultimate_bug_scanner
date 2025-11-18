@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const fs = require('fs');
+const fs = require('fs/promises');
 const path = require('path');
 let ts;
 try {
@@ -12,20 +12,21 @@ const projectDir = path.resolve(process.argv[2] || process.cwd());
 const SKIP_DIRS = new Set(['.git', '.hg', '.svn', 'node_modules', 'dist', 'build', '.next', '.nuxt', '.turbo', '.expo']);
 const EXTENSIONS = new Set(['.ts', '.tsx']);
 
-function collectFiles(dir) {
-  const results = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (SKIP_DIRS.has(entry.name)) continue;
+async function collectFiles(dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const batches = await Promise.all(entries.map(async (entry) => {
+    if (SKIP_DIRS.has(entry.name)) return [];
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name.startsWith('.') && entry.name.length > 1) continue;
-      results.push(...collectFiles(fullPath));
-    } else if (EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-      results.push(fullPath);
+      if (entry.name.startsWith('.') && entry.name.length > 1) return [];
+      return collectFiles(fullPath);
     }
-  }
-  return results;
+    if (EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+      return [fullPath];
+    }
+    return [];
+  }));
+  return batches.flat();
 }
 
 function formatLocation(file, sourceFile, pos) {
@@ -33,8 +34,8 @@ function formatLocation(file, sourceFile, pos) {
   return `${file}:${lc.line + 1}:${lc.character + 1}`;
 }
 
-function analyzeFileWithTs(filePath) {
-  const sourceText = fs.readFileSync(filePath, 'utf8');
+async function analyzeFileWithTs(filePath) {
+  const sourceText = await fs.readFile(filePath, 'utf8');
   const scriptKind = filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, scriptKind);
   const results = [];
@@ -146,8 +147,9 @@ function analyzeFileWithTs(filePath) {
   return results;
 }
 
-function analyzeFileFallback(filePath) {
-  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+async function analyzeFileFallback(filePath) {
+  const text = await fs.readFile(filePath, 'utf8');
+  const lines = text.split(/\r?\n/);
   const results = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -176,11 +178,11 @@ function analyzeFileFallback(filePath) {
   return results;
 }
 
-function main() {
-  const files = collectFiles(projectDir);
+async function main() {
+  const files = await collectFiles(projectDir);
   let total = 0;
   for (const file of files) {
-    const issues = ts ? analyzeFileWithTs(file) : analyzeFileFallback(file);
+    const issues = ts ? await analyzeFileWithTs(file) : await analyzeFileFallback(file);
     issues.forEach(({ location, message }) => {
       total++;
       console.log(`${location}\t${message}`);
@@ -189,7 +191,9 @@ function main() {
   if (!ts) {
     console.log('[ubs-type-narrowing] TypeScript compiler not detected');
   }
-  process.exit(0);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

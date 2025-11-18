@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Tuple
 
-SKIP_DIRS = {"target", ".git", "node_modules"}
+SKIP_DIRS = {"target", ".git", ".hg", ".svn", "node_modules"}
 UNWRAP_PATTERN = "{name}\\s*\\.(?:unwrap|expect)\\s*\\("
 ASSIGN_PATTERN = "{name}\\s*="
 EXIT_PATTERN = re.compile(r"\b(return|break|continue)\b")
@@ -57,9 +57,15 @@ def iter_rust_files(root: Path) -> Iterable[Path]:
             yield root
         return
     for path in root.rglob("*.rs"):
-        if any(part in SKIP_DIRS for part in path.parts):
+        if not path.is_file():
             continue
-        if path.is_file():
+        try:
+            rel = path.relative_to(root)
+        except ValueError:
+            rel = path
+        if any(part in SKIP_DIRS for part in rel.parts):
+            continue
+        if is_safe_path(path):
             yield path
 
 
