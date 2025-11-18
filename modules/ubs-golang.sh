@@ -69,6 +69,12 @@ AST_SARIF=""
 AST_SCAN_OK=0
 RUN_GO_TOOLS=0
 GOTEST_PKGS="./..."
+CATEGORY_WHITELIST=""
+case "${UBS_CATEGORY_FILTER:-}" in
+  resource-lifecycle)
+    CATEGORY_WHITELIST="5,17"
+    ;;
+esac
 
 # Async error coverage metadata
 ASYNC_ERROR_RULE_IDS=(go.async.goroutine-err-no-check)
@@ -165,7 +171,7 @@ Options:
   --test-pkgs=PKGS         Package pattern for tests/vet (default: ./...)
   -h, --help               Show help
 Env:
-  JOBS, NO_COLOR, CI
+  JOBS, NO_COLOR, CI, UBS_CATEGORY_FILTER
 Args:
   PROJECT_DIR              Directory to scan (default: ".")
   OUTPUT_FILE              File to save the report (optional)
@@ -1082,6 +1088,12 @@ run_ast_rules() {
 # ────────────────────────────────────────────────────────────────────────────
 should_skip() {
   local cat="$1"
+  if [[ -n "$CATEGORY_WHITELIST" ]]; then
+    local allowed=1
+    IFS=',' read -r -a allow <<<"$CATEGORY_WHITELIST"
+    for s in "${allow[@]}"; do [[ "$s" == "$cat" ]] && allowed=0; done
+    [[ $allowed -eq 1 ]] && return 1
+  fi
   if [[ -z "$SKIP_CATEGORIES" ]]; then return 0; fi
   IFS=',' read -r -a arr <<<"$SKIP_CATEGORIES"
   for s in "${arr[@]}"; do [[ "$s" == "$cat" ]] && return 1; done

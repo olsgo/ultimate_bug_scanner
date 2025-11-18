@@ -141,7 +141,7 @@ Options:
   -h, --help                 Show help
 
 Env:
-  JOBS, NO_COLOR, NO_EMOJI, CI
+  JOBS, NO_COLOR, NO_EMOJI, CI, UBS_CATEGORY_FILTER
 
 Args:
   PROJECT_DIR                Directory to scan (default: ".")
@@ -551,7 +551,9 @@ run_swift_type_narrowing_checks() {
     print_finding "info" 0 "Swift type narrowing checks skipped" "Set UBS_SKIP_TYPE_NARROWING=0 or remove --skip-type-narrowing to re-enable"
     return 0
   fi
-  local helper="$SCRIPT_DIR/helpers/type_narrowing_swift.py"
+  local script_dir helper
+  script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  helper="$script_dir/helpers/type_narrowing_swift.py"
   if [[ ! -f "$helper" ]]; then
     print_finding "info" 0 "Swift type narrowing helper missing" "$helper not found"
     return 0
