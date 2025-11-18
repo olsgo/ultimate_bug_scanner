@@ -211,6 +211,48 @@ report_type_narrowing_status() {
   return 0
 }
 
+count_swift_files() {
+  local dir="$1"
+  local count=0
+  if command -v rg >/dev/null 2>&1; then
+    count=$(rg --files "$dir" -g '*.swift' 2>/dev/null | wc -l | awk 'END{print $1+0}')
+  else
+    count=$(find "$dir" -type f -name '*.swift' 2>/dev/null | wc -l | awk 'END{print $1+0}')
+  fi
+  echo "$count"
+}
+
+report_swift_guard_readiness() {
+  echo -e "${BOLD}Swift guard readiness:${RESET}"
+  if [ "$SKIP_TYPE_NARROWING" -eq 1 ]; then
+    log "  [skip] Swift guard helper disabled via --skip-type-narrowing"
+    record_session_fact "swift guard helper" "skipped (--skip-type-narrowing)"
+    echo ""
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "  python3 not found – Swift guard helper requires python3"
+    record_session_fact "swift guard helper" "python3 missing"
+    echo ""
+    return 0
+  fi
+  local scan_root="$PWD"
+  if [ -n "${PROJECT_DIR:-}" ] && [ -d "$PROJECT_DIR" ]; then
+    scan_root="$PROJECT_DIR"
+  fi
+  local swift_count
+  swift_count=$(count_swift_files "$scan_root")
+  if [ "$swift_count" -gt 0 ]; then
+    success "  Swift files detected under $scan_root: $swift_count (guard helper active)"
+    record_session_fact "swift guard helper" "$swift_count Swift files detected (helper ready)"
+  else
+    log "  No Swift files detected under $scan_root (helper idle until Swift code appears)"
+    record_session_fact "swift guard helper" "no Swift files detected (idle)"
+  fi
+  echo ""
+  return 0
+}
+
 register_temp_path() {
   local path="$1"
   TEMP_FILES+=("$path")
@@ -1465,6 +1507,8 @@ diagnostic_check() {
   echo -e "${BOLD}Type narrowing readiness:${RESET}"
   report_type_narrowing_status
   echo ""
+
+  report_swift_guard_readiness
 
   echo ""
   echo -e "${BOLD}💡 To share this diagnostic report:${RESET}"

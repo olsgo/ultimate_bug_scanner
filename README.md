@@ -1121,6 +1121,8 @@ curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scan
 > ℹ️ After every install the script now double-checks `command -v ubs`. If another copy shadows the freshly written binary, you’ll get an explicit warning with both paths so you can fix PATH order before running scans.
 
 > 🧠 Type narrowing relies on Node.js plus the `typescript` npm package *and* the Python helpers that power the Rust/Kotlin/Swift checks. The installer now checks Node/TypeScript readiness, can optionally run `npm install -g typescript`, and surfaces the status inside `install.sh --diagnose`. Use `--skip-type-narrowing` if you’re on an air-gapped host or plan to keep the heuristic-only mode.
+>
+> 🍎 The diagnostics also call out Swift guard readiness: if python3 is available we count `.swift` files under your repo and record whether the guard helper will actually run. That fact shows up in `install.sh --diagnose` output and the auto-generated session log so iOS/macOS teams can tell at a glance whether the ObjC-bridging heuristics are active.
 
 **Common combos**
 
