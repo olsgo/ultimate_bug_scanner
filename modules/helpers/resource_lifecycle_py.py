@@ -5,14 +5,19 @@ from __future__ import annotations
 import ast
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 TARGET_SIGS: Dict[Tuple[Optional[str], str], str] = {
     (None, "open"): "file_handle",
-    (None, "connect"): "socket_handle",
-    (None, "Popen"): "popen_handle",
-    (None, "popen"): "popen_handle",
+    ("io", "open"): "file_handle",
+    ("pathlib", "open"): "file_handle",
+    ("pathlib.Path", "open"): "file_handle",
+    ("tempfile", "NamedTemporaryFile"): "file_handle",
+    ("tempfile", "TemporaryFile"): "file_handle",
+    ("tempfile", "SpooledTemporaryFile"): "file_handle",
     ("socket", "socket"): "socket_handle",
+    ("socket", "create_connection"): "socket_handle",
+    ("socket", "socketpair"): "socket_handle",
     ("subprocess", "Popen"): "popen_handle",
     ("asyncio", "create_task"): "asyncio_task",
     ("context", "WithCancel"): "context_cancel",
@@ -22,10 +27,42 @@ TARGET_SIGS: Dict[Tuple[Optional[str], str], str] = {
 
 RELEASE_METHODS = {
     "file_handle": {"close"},
-    "socket_handle": {"close"},
+    "socket_handle": {"close", "shutdown"},
     "popen_handle": {"wait", "communicate", "terminate", "kill"},
     "asyncio_task": {"cancel"},
 }
+
+TASK_RELEASE_SIGS = {
+    ("asyncio", "gather"),
+    ("asyncio", "wait"),
+    ("asyncio", "wait_for"),
+}
+
+MESSAGE_TEMPLATES = {
+    "file_handle": "File handle {name} opened without context manager or close()",
+    "socket_handle": "Socket {name} opened without close()",
+    "popen_handle": "subprocess handle {name} never waited/terminated",
+    "asyncio_task": "asyncio task {name} neither awaited nor cancelled",
+    "context_cancel": "context cancel function {name} never invoked",
+}
+
+IGNORED_PARTS = {
+    ".git",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+    "env",
+    "envs",
+    "site-packages",
+    "target",
+}
+
 
 class ResourceRecord:
     __slots__ = ("name", "kind", "lineno", "released")
@@ -62,18 +99,29 @@ class Analyzer(ast.NodeVisitor):
 
     # With/async with -----------------------------------------------------
     def visit_With(self, node: ast.With) -> None:
-        self._mark_safe(node.items)
+        self._mark_context_safe(node.items)
         self.generic_visit(node)
 
     def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
-        self._mark_safe(node.items)
+        self._mark_context_safe(node.items)
         self.generic_visit(node)
 
-    def _mark_safe(self, items: List[ast.withitem]) -> None:
+    def _mark_context_safe(self, items: List[ast.withitem]) -> None:
         for item in items:
-            sig = self._call_signature_from_expr(item.context_expr)
+            self._mark_safe_calls(item.context_expr)
+
+    def _mark_safe_calls(self, expr: ast.AST) -> None:
+        if isinstance(expr, ast.Call):
+            sig = self._call_signature(expr)
             if sig and sig in TARGET_SIGS:
-                self.safe_calls.add(id(item.context_expr))
+                self.safe_calls.add(id(expr))
+            for arg in expr.args:
+                self._mark_safe_calls(arg)
+            for kw in expr.keywords:
+                if kw.value is not None:
+                    self._mark_safe_calls(kw.value)
+        elif isinstance(expr, ast.Attribute) and expr.value is not None:
+            self._mark_safe_calls(expr.value)
 
     # Assignments --------------------------------------------------------
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -86,19 +134,18 @@ class Analyzer(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _handle_assignment(self, targets: List[ast.expr], value: ast.AST) -> None:
-        sig = self._call_signature(value)
+        sig = self._call_signature_from_expr(value)
         if not sig:
             return
         kind = TARGET_SIGS.get(sig)
         if not kind:
             return
         self.assigned_calls.add(id(value))
-        names = [name for tgt in targets for name in self._collect_names(tgt)]
+        names = [name for target in targets for name in self._collect_names(target)]
         if kind == "context_cancel":
-            # expect second target to be cancel func
             if len(names) >= 2:
                 self._add_record(names[1], kind, value.lineno)
-            elif len(names) == 1:
+            elif names:
                 self._add_record(names[0], kind, value.lineno)
             else:
                 self._add_record(None, kind, value.lineno)
@@ -110,14 +157,13 @@ class Analyzer(ast.NodeVisitor):
             self._add_record(name, kind, value.lineno)
 
     def _collect_names(self, node: ast.expr) -> List[str]:
-        if isinstance(node, ast.Name):
-            return [node.id]
         if isinstance(node, (ast.Tuple, ast.List)):
             names: List[str] = []
             for elt in node.elts:
                 names.extend(self._collect_names(elt))
             return names
-        return []
+        dotted = self._dotted_name(node)
+        return [dotted] if dotted else []
 
     # Calls/releases -----------------------------------------------------
     def visit_Call(self, node: ast.Call) -> None:
@@ -135,18 +181,37 @@ class Analyzer(ast.NodeVisitor):
 
     def _handle_release(self, node: ast.Call) -> None:
         func = node.func
-        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
-            name = func.value.id
+        if isinstance(func, ast.Attribute):
+            name = self._dotted_name(func.value)
             method = func.attr
             for kind, methods in RELEASE_METHODS.items():
                 if method in methods:
                     self._mark_released(name, kind)
                     break
-        elif isinstance(func, ast.Name):
+        elif isinstance(func, ast.Name) and func.id == "cancel":
             self._mark_released(func.id, "context_cancel")
 
+        sig = self._call_signature(node)
+        if sig in TASK_RELEASE_SIGS:
+            for arg_name in self._iter_task_args(node.args):
+                self._mark_released(arg_name, "asyncio_task")
+            for kw in node.keywords:
+                if kw.value is not None:
+                    for arg_name in self._iter_task_args([kw.value]):
+                        self._mark_released(arg_name, "asyncio_task")
+
+    def _iter_task_args(self, args: Iterable[ast.AST]) -> Iterable[str]:
+        for arg in args:
+            if isinstance(arg, ast.Name):
+                yield arg.id
+            elif isinstance(arg, (ast.Tuple, ast.List, ast.Set)):
+                for elt in arg.elts:
+                    yield from self._iter_task_args([elt])
+
     # Helpers ------------------------------------------------------------
-    def _mark_released(self, name: str, kind: str) -> None:
+    def _mark_released(self, name: Optional[str], kind: str) -> None:
+        if not name:
+            return
         entries = self.by_name.get(name)
         if not entries:
             return
@@ -178,35 +243,56 @@ class Analyzer(ast.NodeVisitor):
             attr = func.attr
             if isinstance(base, ast.Name):
                 module, obj = self.aliases.get(base.id, (base.id, None))
-                if attr in {"open", "connect", "Popen", "popen"}:
-                    return (None, attr)
                 if obj:
                     module = module or obj
                 return (module, attr)
-            if attr in {"open", "connect", "Popen", "popen"}:
-                return (None, attr)
+            if isinstance(base, ast.Attribute):
+                dotted = self._dotted_name(base)
+                if dotted:
+                    return (dotted, attr)
+            if isinstance(base, ast.Call):
+                inner = self._call_signature(base)
+                if inner:
+                    module, obj = inner
+                    module_name = module or ""
+                    if obj:
+                        module_name = f"{module}.{obj}" if module else obj
+                    return (module_name or obj, attr)
+        return None
+
+    def _dotted_name(self, expr: ast.expr) -> Optional[str]:
+        if isinstance(expr, ast.Name):
+            return expr.id
+        if isinstance(expr, ast.Attribute):
+            base = self._dotted_name(expr.value)
+            if base:
+                return f"{base}.{expr.attr}"
         return None
 
     def report(self, path: Path) -> List[str]:
         issues: List[str] = []
-        for rec in self.records:
+        for rec in sorted(self.records, key=lambda r: (r.lineno, r.kind, r.name or "")):
             if rec.released:
                 continue
-            issues.append(f"{path}:{rec.lineno}\t{rec.kind}\t")
+            template = MESSAGE_TEMPLATES.get(rec.kind, "Resource not released")
+            subject = rec.name or rec.kind
+            message = template.format(name=subject)
+            issues.append(f"{path}:{rec.lineno}\t{rec.kind}\t{message}")
         return issues
 
 
 def collect_files(root: Path) -> List[Path]:
-    ignored = {".git", "__pycache__", "node_modules", "dist", "build", ".venv", "env", "venv"}
     files: List[Path] = []
+    if root.is_file() and root.suffix == ".py":
+        return [root]
     for path in root.rglob("*.py"):
-        if any(part in ignored for part in path.parts):
+        if any(part in IGNORED_PARTS for part in path.parts):
             continue
         files.append(path)
     return files
 
 
-def analyze(path: Path) -> List[str]:
+def analyze(path: Path, root: Path) -> List[str]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -217,7 +303,12 @@ def analyze(path: Path) -> List[str]:
         return []
     analyzer = Analyzer(tree)
     analyzer.visit(tree)
-    return analyzer.report(path)
+    display: Path
+    try:
+        display = path.relative_to(root)
+    except ValueError:
+        display = path
+    return analyzer.report(display)
 
 
 def main() -> None:
@@ -226,8 +317,8 @@ def main() -> None:
         sys.exit(2)
     root = Path(sys.argv[1])
     issues: List[str] = []
-    for path in collect_files(root):
-        issues.extend(analyze(path))
+    for path in sorted(collect_files(root), key=lambda p: str(p)):
+        issues.extend(analyze(path, root))
     if issues:
         print("\n".join(issues))
 
