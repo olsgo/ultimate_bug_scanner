@@ -34,6 +34,7 @@ run_installer() {
         --skip-ast-grep \
         --skip-ripgrep \
         --skip-jq \
+        --skip-doctor \
         --skip-hooks \
         --skip-version-check \
         --no-path-modify \

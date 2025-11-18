@@ -1038,6 +1038,67 @@ warn_if_stale_binary() {
   fi
 }
 
+write_session_summary() {
+  local status="$1"
+  local log_path="$2"
+  local install_dir="$3"
+  local note="$4"
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ubs"
+  mkdir -p "$config_dir" 2>/dev/null || true
+  local summary="$config_dir/session.md"
+  {
+    printf "## Install Session – %s\n\n" "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+    printf "- Installer version: %s\n" "$VERSION"
+    printf "- Install directory: %s\n" "$install_dir"
+    if [ "${#ORIGINAL_ARGS[@]}" -gt 0 ]; then
+      printf "- Session args: %s\n" "${ORIGINAL_ARGS[*]}"
+    fi
+    if [ -n "$SESSION_AGENT_SUMMARY" ]; then
+      printf "- Detected agents: %s\n" "$SESSION_AGENT_SUMMARY"
+    fi
+    printf "- Auto doctor: %s" "$status"
+    [ -n "$note" ] && printf " (%s)" "$note"
+    printf "\n"
+    if [ -n "$log_path" ] && [ -f "$log_path" ]; then
+      printf "\nDoctor output (tail):\n```\n"
+      tail -n 40 "$log_path"
+      printf "```\n"
+    fi
+    printf "\n---\n\n"
+  } >> "$summary" 2>/dev/null || true
+}
+
+run_post_install_doctor() {
+  local installed_bin="$1"
+  local install_dir="$2"
+  local reason=""
+  if [ "$RUN_DOCTOR" -ne 1 ]; then
+    write_session_summary "SKIPPED" "" "$install_dir" "disabled via flag"
+    return 0
+  fi
+  if dry_run_enabled; then
+    log_dry_run "Would run 'ubs doctor' and capture summary."
+    write_session_summary "SKIPPED" "" "$install_dir" "dry-run mode"
+    return 0
+  fi
+  if [ ! -x "$installed_bin" ]; then
+    warn "'ubs doctor' skipped because $installed_bin is not executable"
+    write_session_summary "FAILED" "" "$install_dir" "installer binary missing"
+    return 0
+  fi
+  log "Running 'ubs doctor' (post-install health check)..."
+  local doctor_log
+  doctor_log="$(mktemp_in_workdir "doctor.log.XXXXXX")"
+  local status="PASS"
+  if NO_COLOR=1 "$installed_bin" doctor >"$doctor_log" 2>&1; then
+    success "'ubs doctor' completed without issues"
+  else
+    warn "'ubs doctor' reported issues"
+    status="FAIL"
+  fi
+  write_session_summary "$status" "$doctor_log" "$install_dir" "$reason"
+}
+
 # ==============================================================================
 # TIER 2 ENHANCEMENTS: Configuration, Diagnostics, Uninstall, More AI Tools
 # ==============================================================================
@@ -1090,8 +1151,8 @@ read_config_file() {
       skip_typos)
         SKIP_TYPOS="$(normalize_bool "$value")"
         ;;
-      skip_type_narrowing)
-        SKIP_TYPE_NARROWING="$(normalize_bool "$value")"
+      skip_doctor)
+        RUN_DOCTOR=$((1 - $(normalize_bool "$value")))
         ;;
       skip_hooks)
         SKIP_HOOKS="$(normalize_bool "$value")"
@@ -1157,7 +1218,7 @@ skip_ripgrep=0
 skip_jq=0
 skip_typos=0
 skip_type_narrowing=0
-skip_type_narrowing=0
+skip_doctor=0
 
 # Skip version checking on install
 skip_version_check=0
@@ -2579,8 +2640,8 @@ shift
 SKIP_TYPOS=1
 shift
 ;;
---skip-type-narrowing)
-SKIP_TYPE_NARROWING=1
+--skip-doctor)
+RUN_DOCTOR=0
 shift
 ;;
 --skip-hooks)
@@ -2752,6 +2813,7 @@ log "Detected coding agents:"
 log "  Core: claude=${HAS_AGENT_CLAUDE} codex=${HAS_AGENT_CODEX} cursor=${HAS_AGENT_CURSOR}"
 log "  Extended: gemini=${HAS_AGENT_GEMINI} windsurf=${HAS_AGENT_WINDSURF} cline=${HAS_AGENT_CLINE} opencode=${HAS_AGENT_OPENCODE}"
 log "  Additional: aider=${HAS_AGENT_AIDER} continue=${HAS_AGENT_CONTINUE} copilot=${HAS_AGENT_COPILOT} tabnine=${HAS_AGENT_TABNINE} replit=${HAS_AGENT_REPLIT}"
+SESSION_AGENT_SUMMARY="core(claude=${HAS_AGENT_CLAUDE}, codex=${HAS_AGENT_CODEX}, cursor=${HAS_AGENT_CURSOR}); extended(gemini=${HAS_AGENT_GEMINI}, windsurf=${HAS_AGENT_WINDSURF}, cline=${HAS_AGENT_CLINE}, opencode=${HAS_AGENT_OPENCODE}); additional(aider=${HAS_AGENT_AIDER}, continue=${HAS_AGENT_CONTINUE}, copilot=${HAS_AGENT_COPILOT}, tabnine=${HAS_AGENT_TABNINE}, replit=${HAS_AGENT_REPLIT})"
 
 if [ "$SKIP_HOOKS" -eq 0 ]; then
 maybe_setup_hook "Git pre-commit hook" -1 setup_git_hook
@@ -2784,6 +2846,11 @@ fi
 
 warn_if_stale_binary
 
+local install_dir
+install_dir="$(determine_install_dir)"
+
+run_post_install_doctor "$install_dir/$INSTALL_NAME" "$install_dir"
+
 echo ""
 echo -e "${BOLD}${GREEN}"
 cat << 'SUCCESS'
@@ -2797,9 +2864,6 @@ cat << 'SUCCESS'
 SUCCESS
 echo -e "${RESET}"
 echo ""
-
-local install_dir
-install_dir="$(determine_install_dir)"
 
 local cmd_available=0
 if command -v ubs >/dev/null 2>&1; then
