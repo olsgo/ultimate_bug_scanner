@@ -60,6 +60,9 @@ DRY_RUN=0
 RUN_SELF_TEST=0
 RUN_DOCTOR=1
 SESSION_AGENT_SUMMARY=""
+SESSION_SUMMARY_FILE=""
+declare -a SESSION_FACT_KEYS=()
+declare -A SESSION_FACTS=()
 
 # Temporary files tracking for cleanup
 TEMP_FILES=()
@@ -104,6 +107,37 @@ log_section() {
   echo -e "${BOLD}${BLUE}╔═══════════════════════════════════════════════════${RESET}"
   printf "${BOLD}${BLUE}║ %-51s ║${RESET}\n" "$title"
   echo -e "${BOLD}${BLUE}╚═══════════════════════════════════════════════════${RESET}"
+}
+
+record_session_fact() {
+  local key="$1"
+  local value="$2"
+  [ -z "$key" ] && return 0
+  local exists=0
+  for existing in "${SESSION_FACT_KEYS[@]}"; do
+    if [ "$existing" = "$key" ]; then
+      exists=1
+      break
+    fi
+  done
+  if [ "$exists" -eq 0 ]; then
+    SESSION_FACT_KEYS+=("$key")
+  fi
+  SESSION_FACTS["$key"]="$value"
+}
+
+record_tool_status() {
+  local label="$1"
+  local skip_flag="$2"
+  local check_fn="$3"
+  local skip_reason="$4"
+  if [ "$skip_flag" -eq 1 ]; then
+    record_session_fact "$label" "skipped (${skip_reason})"
+  elif "$check_fn" >/dev/null 2>&1; then
+    record_session_fact "$label" "installed"
+  else
+    record_session_fact "$label" "missing"
+  fi
 }
 
 print_help_option() {
@@ -1046,6 +1080,7 @@ write_session_summary() {
   local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ubs"
   mkdir -p "$config_dir" 2>/dev/null || true
   local summary="$config_dir/session.md"
+  SESSION_SUMMARY_FILE="$summary"
   {
     printf "## Install Session – %s\n\n" "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
     printf "- Installer version: %s\n" "$VERSION"
@@ -1059,6 +1094,12 @@ write_session_summary() {
     printf "- Auto doctor: %s" "$status"
     [ -n "$note" ] && printf " (%s)" "$note"
     printf "\n"
+    if [ "${#SESSION_FACT_KEYS[@]}" -gt 0 ]; then
+      printf "- Tool readiness:\n"
+      for key in "${SESSION_FACT_KEYS[@]}"; do
+        printf "  - %s: %s\n" "$key" "${SESSION_FACTS[$key]}"
+      done
+    fi
     if [ -n "$log_path" ] && [ -f "$log_path" ]; then
       printf "\nDoctor output (tail):\n```\n"
       tail -n 40 "$log_path"
@@ -1071,7 +1112,7 @@ write_session_summary() {
 run_post_install_doctor() {
   local installed_bin="$1"
   local install_dir="$2"
-  local reason=""
+  local note=""
   if [ "$RUN_DOCTOR" -ne 1 ]; then
     write_session_summary "SKIPPED" "" "$install_dir" "disabled via flag"
     return 0
@@ -1090,13 +1131,15 @@ run_post_install_doctor() {
   local doctor_log
   doctor_log="$(mktemp_in_workdir "doctor.log.XXXXXX")"
   local status="PASS"
+  note="All checks passed"
   if NO_COLOR=1 "$installed_bin" doctor >"$doctor_log" 2>&1; then
     success "'ubs doctor' completed without issues"
   else
     warn "'ubs doctor' reported issues"
     status="FAIL"
+    note="Review output above or run 'ubs doctor --fix'. View latest log via 'ubs sessions --entries 1'."
   fi
-  write_session_summary "$status" "$doctor_log" "$install_dir" "$reason"
+  write_session_summary "$status" "$doctor_log" "$install_dir" "$note"
 }
 
 # ==============================================================================
@@ -2718,42 +2761,48 @@ echo ""
 
 # Check for ast-grep
 
-if ! check_ast_grep && [ "$SKIP_AST_GREP" -eq 0 ]; then
+if [ "$SKIP_AST_GREP" -eq 1 ]; then
+log "[skip] ast-grep installation disabled via --skip-ast-grep"
+elif ! check_ast_grep; then
 warn "ast-grep not found (recommended for best results)"
 if ask "Install ast-grep now?"; then
 install_ast_grep || warn "Continuing without ast-grep (regex mode only)"
 fi
-echo ""
 else
 success "ast-grep is installed"
-echo ""
 fi
+record_tool_status "ast-grep" "$SKIP_AST_GREP" check_ast_grep "--skip-ast-grep"
+echo ""
 
 # Check for ripgrep
 
-if ! check_ripgrep && [ "$SKIP_RIPGREP" -eq 0 ]; then
+if [ "$SKIP_RIPGREP" -eq 1 ]; then
+log "[skip] ripgrep installation disabled via --skip-ripgrep"
+elif ! check_ripgrep; then
 warn "ripgrep not found (required for optimal performance)"
 if ask "Install ripgrep now?"; then
 install_ripgrep || warn "Continuing without ripgrep (may use slower grep fallback)"
 fi
-echo ""
 else
 success "ripgrep is installed"
-echo ""
 fi
+record_tool_status "ripgrep" "$SKIP_RIPGREP" check_ripgrep "--skip-ripgrep"
+echo ""
 
 # Check for jq
 
-if ! check_jq && [ "$SKIP_JQ" -eq 0 ]; then
+if [ "$SKIP_JQ" -eq 1 ]; then
+log "[skip] jq installation disabled via --skip-jq"
+elif ! check_jq; then
 warn "jq not found (required for JSON/SARIF merging)"
 if ask "Install jq now?"; then
 install_jq || warn "Continuing without jq (merged outputs disabled)"
 fi
-echo ""
 else
 success "jq is installed"
-echo ""
 fi
+record_tool_status "jq" "$SKIP_JQ" check_jq "--skip-jq"
+echo ""
 
 # Check for typos
 if [ "$SKIP_TYPOS" -eq 1 ]; then
@@ -2766,25 +2815,45 @@ elif ! check_typos; then
 else
   success "typos is installed"
 fi
+record_tool_status "typos" "$SKIP_TYPOS" check_typos "--skip-typos"
 echo ""
 
 # Type narrowing readiness (Node + TypeScript)
+type_narrowing_fact=""
 if [ "$SKIP_TYPE_NARROWING" -eq 1 ]; then
   log "[skip] Type narrowing dependencies skipped via --skip-type-narrowing"
+  type_narrowing_fact="skipped (--skip-type-narrowing)"
 else
   if ! check_node; then
     warn "Node.js not found – type narrowing uses text heuristics only. Install Node.js from https://nodejs.org or your package manager (npm included) for richer analysis."
+    type_narrowing_fact="Node.js missing (heuristic mode)"
   else
     if check_typescript_pkg; then
       success "TypeScript package detected (type narrowing ready)"
+      type_narrowing_fact="ready (TypeScript present)"
     else
       warn "TypeScript package not found – run 'npm install -g typescript' or add it to devDependencies."
+      type_narrowing_fact="TypeScript missing (install via npm for rich mode)"
       if command -v npm >/dev/null 2>&1 && ask "Install TypeScript globally via npm now?"; then
-        install_typescript || warn "Continuing without TypeScript (type narrowing fallback mode only)"
+        if install_typescript; then
+          type_narrowing_fact="installed TypeScript via installer"
+        else
+          warn "Continuing without TypeScript (type narrowing fallback mode only)"
+        fi
       fi
     fi
   fi
 fi
+if [ -z "$type_narrowing_fact" ]; then
+  if check_node && check_typescript_pkg; then
+    type_narrowing_fact="ready (TypeScript present)"
+  elif check_node; then
+    type_narrowing_fact="TypeScript missing (install via npm for rich mode)"
+  else
+    type_narrowing_fact="Node.js missing (heuristic mode)"
+  fi
+fi
+record_session_fact "type narrowing" "$type_narrowing_fact"
 echo ""
 
 # Install the scanner
@@ -2851,6 +2920,10 @@ install_dir="$(determine_install_dir)"
 
 run_post_install_doctor "$install_dir/$INSTALL_NAME" "$install_dir"
 
+if [ -n "${SESSION_SUMMARY_FILE:-}" ]; then
+  log "Installer session saved to $SESSION_SUMMARY_FILE (view with 'ubs sessions --entries 1')."
+fi
+
 echo ""
 echo -e "${BOLD}${GREEN}"
 cat << 'SUCCESS'
@@ -2879,6 +2952,7 @@ echo -e "${BOLD}${BLUE}┌─ Quick Start${RESET}"
 echo -e "${BLUE}│${RESET}"
 echo -e "${BLUE}├──${RESET} ${BOLD}Run scanner:${RESET}    ${GREEN}ubs .${RESET}"
 echo -e "${BLUE}├──${RESET} ${BOLD}Get help:${RESET}       ${GREEN}ubs --help${RESET}"
+echo -e "${BLUE}├──${RESET} ${BOLD}View session log:${RESET} ${GREEN}ubs sessions --entries 1${RESET}"
 echo -e "${BLUE}└──${RESET} ${BOLD}Verbose mode:${RESET}   ${GREEN}ubs -v .${RESET}"
 echo ""
 [ "$NO_PATH_MODIFY" -eq 1 ] && warn "PATH was not modified per --no-path-modify; ensure $install_dir is on PATH."
@@ -2891,6 +2965,7 @@ echo -e "${BOLD}${BLUE}┌─ Then Try${RESET}"
 echo -e "${BLUE}│${RESET}"
 echo -e "${BLUE}├──${RESET} ${BOLD}Run scanner:${RESET}    ${GREEN}ubs .${RESET}"
 echo -e "${BLUE}├──${RESET} ${BOLD}Get help:${RESET}       ${GREEN}ubs --help${RESET}"
+echo -e "${BLUE}├──${RESET} ${BOLD}View session log:${RESET} ${GREEN}ubs sessions --entries 1${RESET}"
 echo -e "${BLUE}└──${RESET} ${BOLD}Verbose mode:${RESET}   ${GREEN}ubs -v .${RESET}"
 fi
 

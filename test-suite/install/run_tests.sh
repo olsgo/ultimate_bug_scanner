@@ -8,6 +8,29 @@ tests_failed=0
 tmpdirs=()
 SELF_TEST_MODE="${UBS_INSTALLER_SELF_TEST:-0}"
 
+check_sessions_command() {
+  local home_dir="$1"
+  local output_file="$2"
+  local bin="$home_dir/.local/bin/ubs"
+  if ! HOME="$home_dir" XDG_CONFIG_HOME="$home_dir/.config" "$bin" sessions --entries 1 >"$output_file" 2>&1; then
+    echo "[FAIL] 'ubs sessions' failed (output: $output_file)"
+    tail -n 60 "$output_file" || true
+    tests_failed=1
+    return 1
+  fi
+  if ! grep -q "Install Session" "$output_file"; then
+    echo "[FAIL] session log missing header (output: $output_file)"
+    tests_failed=1
+    return 1
+  fi
+  if ! grep -q "Tool readiness" "$output_file"; then
+    echo "[FAIL] readiness facts missing from session output"
+    tests_failed=1
+    return 1
+  fi
+  echo "[PASS] sessions_command"
+}
+
 cleanup() {
   for dir in "${tmpdirs[@]:-}"; do
     rm -rf "$dir"
@@ -83,6 +106,7 @@ test_basic_smoke() {
   tmpdirs+=("$ctx")
   local home="$ctx/home"
   local log="$ctx/install.log"
+  local session_output="$ctx/session.out"
 
   if run_installer "$home" "$log"; then
     if grep -q "typos not found" "$log"; then
@@ -92,6 +116,7 @@ test_basic_smoke() {
       tests_failed=1
       return
     fi
+    check_sessions_command "$home" "$session_output"
     echo "[PASS] basic_smoke"
   fi
 }
