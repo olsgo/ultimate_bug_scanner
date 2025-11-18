@@ -1,5 +1,17 @@
 data class UserProfile(val email: String?)
 
+class FakeJob {
+    val isActive: Boolean = true
+    fun cancel() {}
+}
+
+fun coroutineJobGuard(job: FakeJob?) {
+    if (job?.isActive == true) {
+        println("job still running")
+    }
+    job!!.cancel()
+}
+
 fun sendWelcome(profile: UserProfile?) {
     if (profile == null) {
         println("missing profile")
@@ -32,16 +44,4 @@ fun smartCast(adminCandidate: Any?) {
 fun elvisForce(profile: UserProfile?) {
     val alias = profile?.email ?: println("no alias yet")
     println("alias length ${alias!!.length}")
-}
-
-class FakeJob {
-    val isActive: Boolean = true
-    fun cancel() {}
-}
-
-fun coroutineJobGuard(job: FakeJob?) {
-    if (job?.isActive == true) {
-        println("job still running")
-    }
-    job!!.cancel()
 }

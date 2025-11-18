@@ -98,10 +98,6 @@ TIMEOUT_CMD=""                        # resolved later
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-0}"
 AST_PASSTHROUGH=0
 AST_TEXT_SUMMARY=1
-CATEGORY_WHITELIST=""
-if [[ "${UBS_CATEGORY_FILTER:-}" == "resource-lifecycle" ]]; then
-  CATEGORY_WHITELIST="19"
-fi
 
 # Async error coverage metadata
 ASYNC_ERROR_RULE_IDS=(py.async.task-no-await)
@@ -1506,12 +1502,6 @@ run_system_or_uv_tool() {
 # ────────────────────────────────────────────────────────────────────────────
 should_skip() {
   local cat="$1"
-  if [[ -n "$CATEGORY_WHITELIST" ]]; then
-    local match=1
-    IFS=',' read -r -a allow <<<"$CATEGORY_WHITELIST"
-    for s in "${allow[@]}"; do [[ "$s" == "$cat" ]] && match=0; done
-    [[ $match -eq 1 ]] && return 1
-  fi
   if [[ -z "$SKIP_CATEGORIES" ]]; then return 0; fi
   IFS=',' read -r -a arr <<<"$SKIP_CATEGORIES"
   for s in "${arr[@]}"; do [[ "$s" == "$cat" ]] && return 1; done

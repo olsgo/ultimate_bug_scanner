@@ -69,10 +69,6 @@ AST_SARIF=""
 AST_SCAN_OK=0
 RUN_GO_TOOLS=0
 GOTEST_PKGS="./..."
-CATEGORY_WHITELIST=""
-if [[ "${UBS_CATEGORY_FILTER:-}" == "resource-lifecycle" ]]; then
-  CATEGORY_WHITELIST="5,17"
-fi
 
 # Async error coverage metadata
 ASYNC_ERROR_RULE_IDS=(go.async.goroutine-err-no-check)

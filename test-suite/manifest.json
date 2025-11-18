@@ -1123,7 +1123,8 @@
         },
         "require_substrings": [
           "Kotlin guard clauses without exit",
-          "Kotlin guard without exit before '!!'"
+          "Kotlin guard without exit before '!!'",
+          "?. guard without exit"
         ]
       }
     },
@@ -1172,7 +1173,8 @@
         },
         "require_substrings": [
           "Swift guard let validation",
-          "Swift guard let else-block may continue"
+          "Swift guard let else-block may continue",
+          "?. guard without exit"
         ]
       }
     },

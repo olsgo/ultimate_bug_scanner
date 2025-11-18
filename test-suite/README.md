@@ -212,6 +212,8 @@ Each file contains **intentional bugs** that the scanner should detect:
 | `rust-type-narrowing-clean` | `test-suite/rust/clean/type_narrowing.rs` | Counterexamples that exit early or propagate via `?`, ensuring the heuristic does not report on safe code paths. |
 | `kotlin-type-narrowing-buggy` | `test-suite/kotlin/type_narrowing/buggy` | Kotlin guards that log/continue instead of exiting, then dereference the nullable value with `!!`, ensuring the JVM module spots unsafe usage outside the guard. |
 | `kotlin-type-narrowing-clean` | `test-suite/kotlin/type_narrowing/clean` | Kotlin fixtures that return/throw or use Elvis early so the analyzer proves it suppresses safe flows. |
+| `swift-type-narrowing-buggy` | `test-suite/swift/type_narrowing/buggy` | Swift guard lets and optional-chain guards that log/continue instead of returning, then force unwrap optionals (including Objective-C bridges) to ensure the helper flags unsafe flows. |
+| `swift-type-narrowing-clean` | `test-suite/swift/type_narrowing/clean` | Swift counterexamples that return/throw or fully bind optionals before use so the analyzer stays quiet on correct patterns. |
 
 ### Realistic Scenarios
 

@@ -4,22 +4,6 @@ struct Profile {
     let email: String?
 }
 
-func sendEmail(profile: Profile?) {
-    guard let email = profile?.email else {
-        print("missing email")
-        return
-    }
-    print("Email ready for \(email.count) characters")
-}
-
-func displayName(raw: String?) {
-    guard let name = raw else {
-        print("empty name provided")
-        return
-    }
-    print("Hello \(name)")
-}
-
 func optionalChainGuardSafe(profile: Profile?) {
     if profile?.email == nil {
         return
@@ -34,4 +18,20 @@ func objcBridgeSafe(nsString: NSString?) {
         return
     }
     NSLog("length = \(ensured.length)")
+}
+
+func sendEmail(profile: Profile?) {
+    guard let email = profile?.email else {
+        print("missing email")
+        return
+    }
+    print("Email ready for \(email.count) characters")
+}
+
+func displayName(raw: String?) {
+    guard let name = raw else {
+        print("empty name provided")
+        return
+    }
+    print("Hello \(name)")
 }

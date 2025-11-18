@@ -1,5 +1,18 @@
 data class UserProfile(val email: String?)
 
+class FakeJob {
+    val isActive: Boolean = true
+    fun cancel() {}
+}
+
+fun coroutineJobGuardSafe(job: FakeJob?) {
+    if (job?.isActive != true) {
+        println("no active job")
+        return
+    }
+    job.cancel()
+}
+
 fun sendWelcome(profile: UserProfile?): String {
     val ensured = profile ?: return "missing profile"
     return ensured.email?.lowercase() ?: "missing email"
@@ -26,17 +39,4 @@ fun smartCastSafe(candidate: Any?): String? {
 fun elvisSafe(profile: UserProfile?): Int? {
     val alias = profile?.email ?: return null
     return alias.length
-}
-
-class FakeJob {
-    val isActive: Boolean = true
-    fun cancel() {}
-}
-
-fun coroutineJobGuardSafe(job: FakeJob?) {
-    if (job?.isActive != true) {
-        println("no active job")
-        return
-    }
-    job.cancel()
 }
