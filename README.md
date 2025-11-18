@@ -107,8 +107,8 @@ const zipCode = parseInt(userInput);  // 💥 "08" becomes 0 in old browsers (oc
 - All shareable outputs inject GitHub permalinks when UBS is run inside a git repo with a GitHub remote. Text output automatically annotates `path:line` references, JSON gains `git.*` metadata, and merged SARIF runs now include `versionControlProvenance` plus `automationDetails` keyed by the comparison id.
 
 #### Resource lifecycle heuristics in each language
-- **Python** – Category 16 now correlates every `open()` call against matching `with open(...)` usage and explicit `encoding=` parameters, while Category 19 cross-references file handles, sockets, subprocesses, and asyncio tasks to ensure `.close()`, `.wait()/cancel()` calls exist. The diff counts (`acquire=X, release=Y, context-managed=Z`) show the exact imbalance per file.
-- **Go** – Category 5/17 look for `os.Open/OpenFile`, `sql.Open`, `context.With*`, `time.NewTicker/NewTimer`, and mutex locks that lack matching `Close/Stop/Unlock/cancel`. The heuristics keep a simple acquire/release counter so leaks show up even without AST packs, and they pair nicely with the existing AST rules (tickers/timers/cancel).
+- **Python** – Category 16 now correlates every `open()` call against matching `with open(...)` usage and explicit `encoding=` parameters, while Category 19 uses the new AST helper at `modules/helpers/resource_lifecycle_py.py` to walk every file, socket, subprocess, asyncio task, and context cancellation path. The helper resolves alias imports, context managers, and awaited tasks so the diff counts (`acquire=X, release=Y, context-managed=Z`) show the exact imbalance per file.
+- **Go** – Category 5/17 now run a Go AST walker (`modules/helpers/resource_lifecycle_go.go`) that detects `context.With*` calls missing cancel, `time.NewTicker/NewTimer` without `Stop`, `os.Open/sql.Open` without `Close`, and mutex `Lock`/`Unlock` symmetry. Findings come straight from the AST positions, so “ticker missing Stop()” lines map to the exact `file:line` instead of coarse regex summaries.
 - **Java** – Category 5 surfaces `FileInputStream`, readers/writers, JDBC handles, etc. that were created outside try-with-resources, while Category 19 keeps tracking executor services and file streams that never close. The new summary text matches the manifest fixtures, so CI will fail if regression swallows these warnings.
 
 #### Shareable output quickstart
@@ -428,8 +428,58 @@ ubs .
 ### **Resource Lifecycle AST Coverage**
 
 - **Python** – `modules/helpers/resource_lifecycle_py.py` now reasons over the AST, tracking `with`/`async with`, alias imports, and `.open()`/`.connect()` calls so `ubs-python` warns only when a handle is truly leaking. Pathlib `Path.open()` and similar patterns are handled without brittle regexes.
-- **Java** – New ast-grep rules (`java.resource.executor-no-shutdown`, `java.resource.thread-no-join`, `java.resource.jdbc-no-close`) ensure ExecutorServices, raw `Thread`s, and `java.sql.Connection`s get proper shutdown/close semantics before the regex fallback ever runs.
+- **Java** – New ast-grep rules (`java.resource.executor-no-shutdown`, `java.resource.thread-no-join`, `java.resource.jdbc-no-close`, `java.resource.resultset-no-close`, `java.resource.statement-no-close`) ensure ExecutorServices, raw `Thread`s, `java.sql.Connection`s, `Statement`/`PreparedStatement`, and `ResultSet` handles all get proper shutdown/close semantics before the regex fallback ever runs.
 - **C++ / Rust / Ruby** – These modules already relied on ast-grep rule packs; the “Universal AST Adoption” epic is now complete with every language module (JS, Python, Go, C++, Rust, Java, Ruby, Swift, Kotlin) running semantic detectors instead of fragile grep-only heuristics.
+
+#### Python – AST helper in action
+
+```python
+import asyncio, subprocess
+
+fh = open("/tmp/leaky.txt", "w")
+proc = subprocess.Popen(["sleep", "1"])
+
+async def leak_task():
+    task = asyncio.create_task(asyncio.sleep(1))
+    await asyncio.sleep(0.1)
+    return task
+
+asyncio.run(leak_task())
+```
+
+```
+$ ./ubs --only=python test-suite/python/buggy/resource_lifecycle.py
+  🔥 File handles opened without context manager/close [resource_lifecycle.py:4]
+    File handle fh opened without context manager or close()
+  ⚠ Popen handles not waited or terminated [resource_lifecycle.py:7]
+```
+
+The helper catches the unguarded file handle, zombie subprocess, and orphaned asyncio task because it walks the AST (tracking aliases and async contexts) instead of grepping for strings.
+
+#### Go – AST helper validating cleanups
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+ticker := time.NewTicker(time.Millisecond * 500)
+timer := time.NewTimer(time.Second)
+f, _ := os.Open("/tmp/data.txt")
+
+_ = ctx
+_ = cancel
+_ = ticker
+_ = timer
+_ = f
+```
+
+```
+$ ./ubs --only=golang test-suite/golang/buggy/resource_lifecycle.go
+  🔥 context.With* without deferred cancel [resource_lifecycle.go:10]
+  ⚠ time.NewTicker not stopped [resource_lifecycle.go:13]
+  ⚠ time.NewTimer not stopped [resource_lifecycle.go:15]
+  ⚠ os.Open/OpenFile without defer Close() [resource_lifecycle.go:17]
+```
+
+Because the helper hashes AST positions, the manifest can assert on deterministic substrings (context/ticker/timer/file) and we avoid flakiness from color codes or log headings.
 
 Use `--skip-type-narrowing` (or `UBS_SKIP_TYPE_NARROWING=1`) when you want to bypass all of these guard analyzers—for example on air-gapped CI environments or when validating legacy projects one language at a time.
 

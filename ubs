@@ -136,7 +136,7 @@ Options:
   --only=CSV              Restrict to languages: js,python,cpp,rust,golang,java,ruby
   --exclude=CSV           Exclude languages
   --module-dir=DIR        Where to store/lookup modules (default: $MODULE_DIR_DEFAULT)
-  --category=CSV          Focus on category packs (resource-lifecycle)
+  --category=CSV          Focus on category packs (e.g., resource-lifecycle for AST lifecycle analyzers)
   --comparison=FILE       Baseline JSON to diff combined results against
   --report-json=FILE      Write combined summary JSON to FILE
   --html-report=FILE      Emit shareable HTML report to FILE
