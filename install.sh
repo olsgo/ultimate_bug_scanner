@@ -18,26 +18,46 @@ ORIGINAL_ARGS=()
 if ((BASH_VERSINFO[0] < 4)); then
   # Attempt macOS auto-remediation via Homebrew
   if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-    # Check for easy mode in args (before parsing)
-    IS_EASY=0
-    for arg in "$@"; do [[ "$arg" == "--easy-mode" ]] && IS_EASY=1; done
+    BREW_PREFIX="$(brew --prefix)"
+    POTENTIAL_BASH="${BREW_PREFIX}/bin/bash"
+    FOUND_VALID_BASH=0
+
+    if [[ -x "$POTENTIAL_BASH" ]]; then
+      POTENTIAL_VER="$("$POTENTIAL_BASH" -c 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null)"
+      if [[ "$POTENTIAL_VER" =~ ^[0-9]+$ ]] && (( POTENTIAL_VER >= 4 )); then
+        FOUND_VALID_BASH=1
+      fi
+    fi
 
     SHOULD_UPGRADE=0
-    if [[ "$IS_EASY" -eq 1 ]]; then
+    NEEDS_INSTALL=1
+
+    if [[ "$FOUND_VALID_BASH" -eq 1 ]]; then
       SHOULD_UPGRADE=1
+      NEEDS_INSTALL=0
     else
-      # Prompt user using /dev/tty to handle piped execution
-      if [ -c /dev/tty ]; then
-        echo "Error: macOS ships with Bash 3.2, but UBS requires 4.0+."
-        echo -ne "Install modern Bash via Homebrew? (y/N): " > /dev/tty
-        read -r REPLY < /dev/tty
-        if [[ "$REPLY" =~ ^[Yy]$ ]]; then SHOULD_UPGRADE=1; fi
+      # Check for easy mode in args (before parsing)
+      IS_EASY=0
+      for arg in "$@"; do [[ "$arg" == "--easy-mode" ]] && IS_EASY=1; done
+
+      if [[ "$IS_EASY" -eq 1 ]]; then
+        SHOULD_UPGRADE=1
+      else
+        # Prompt user using /dev/tty to handle piped execution
+        if [ -c /dev/tty ]; then
+          echo "Error: macOS ships with Bash 3.2, but UBS requires 4.0+."
+          echo -ne "Install modern Bash via Homebrew? (y/N): " > /dev/tty
+          read -r REPLY < /dev/tty
+          if [[ "$REPLY" =~ ^[Yy]$ ]]; then SHOULD_UPGRADE=1; fi
+        fi
       fi
     fi
 
     if [[ "$SHOULD_UPGRADE" -eq 1 ]]; then
-      echo "Upgrading Bash via Homebrew..."
-      brew install bash
+      if [[ "$NEEDS_INSTALL" -eq 1 ]]; then
+        echo "Upgrading Bash via Homebrew..."
+        brew install bash
+      fi
 
       NEW_BASH="$(brew --prefix)/bin/bash"
       if [[ -x "$NEW_BASH" ]]; then
@@ -107,6 +127,7 @@ SKIP_BUN=0
 SKIP_TYPE_NARROWING=0
 TYPE_NARROWING_READY=0
 SKIP_HOOKS=0
+AUTO_UPDATE=0
 INSTALL_DIR=""
 FORCE_REINSTALL=0
 FORCE_UNINSTALL=0
@@ -1326,6 +1347,9 @@ read_config_file() {
       skip_hooks)
         SKIP_HOOKS="$(normalize_bool "$value")"
         ;;
+      auto_update)
+        AUTO_UPDATE="$(normalize_bool "$value")"
+        ;;
       skip_version_check)
         SKIP_VERSION_CHECK="$(normalize_bool "$value")"
         ;;
@@ -1400,6 +1424,9 @@ self_test=0
 
 # Skip hook/integration setup (1=skip, 0=prompt or install in easy mode)
 skip_hooks=0
+
+# Enable daily auto-updates (1=yes, 0=no)
+auto_update=0
 
 # Easy mode: auto-accept all prompts and install everything (1=yes, 0=no)
 easy_mode=0
@@ -2798,6 +2825,58 @@ AGENTS_EOF
 success "Added section to AGENTS.md"
 }
 
+check_cron() {
+  command -v crontab >/dev/null 2>&1
+}
+
+setup_auto_update() {
+  log "Setting up daily auto-updates..."
+
+  if dry_run_enabled; then
+    log_dry_run "Would configure daily auto-updates via cron."
+    return 0
+  fi
+
+  local install_dir
+  install_dir="$(determine_install_dir)"
+  local script_path="$install_dir/$INSTALL_NAME"
+
+  if [ ! -x "$script_path" ]; then
+    warn "Cannot setup auto-update: ubs binary not found at $script_path"
+    return 1
+  fi
+
+  # Command to run: ubs --update --quiet --non-interactive
+  # We use the absolute path to ensure it works in cron
+  local update_cmd="$script_path --update --quiet --non-interactive"
+
+  # Run daily at midnight
+  local cron_schedule="0 0 * * *"
+  local job="$cron_schedule $update_cmd >/dev/null 2>&1 # Ultimate Bug Scanner Auto-Update"
+
+  if ! check_cron; then
+    error "crontab command not found. Cannot schedule auto-updates."
+    return 1
+  fi
+
+  local current_crontab
+  current_crontab="$(crontab -l 2>/dev/null || true)"
+
+  if echo "$current_crontab" | grep -qF "$script_path --update"; then
+    log "Auto-update cron job already exists."
+    return 0
+  fi
+
+  # Append new job
+  if echo -e "${current_crontab}\n${job}" | crontab -; then
+    success "Daily auto-update scheduled via cron."
+    return 0
+  else
+    error "Failed to update crontab."
+    return 1
+  fi
+}
+
 maybe_setup_hook() {
 local label="$1"
 local detected_flag="$2"
@@ -3126,6 +3205,12 @@ maybe_setup_hook "OpenCode MCP guardrails (.opencode/rules)" "$HAS_AGENT_OPENCOD
 maybe_setup_hook "Aider integration (.aider.conf.yml)" "$HAS_AGENT_AIDER" setup_aider_rules
 maybe_setup_hook "Continue integration (.continue/config.json)" "$HAS_AGENT_CONTINUE" setup_continue_rules
 maybe_setup_hook "GitHub Copilot instructions (.github/copilot-instructions.md)" "$HAS_AGENT_COPILOT" setup_copilot_instructions
+
+if [ "$AUTO_UPDATE" -eq 1 ]; then
+  setup_auto_update
+else
+  maybe_setup_hook "Daily auto-updates" "$(check_cron && echo 1 || echo 0)" setup_auto_update
+fi
 echo ""
 fi
 

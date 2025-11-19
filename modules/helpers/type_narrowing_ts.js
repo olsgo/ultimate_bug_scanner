@@ -158,7 +158,7 @@ async function analyzeFileWithTs(filePath) {
         if (ts.isIfStatement(stmt)) {
           const guarded = extractGuardedIdentifier(stmt.expression);
           // If we have a guard, we expect the THEN block to EXIT if the guard was NEGATIVE (e.g. if (!x) return).
-          // But extractGuardedIdentifier returns the identifier for both !x and x == null.
+          // But extractGuardedIdentifier returns the identifier for both !x and x === null.
           // Wait, if the guard is `if (!x)`, then `x` is falsy in the THEN block.
           // So if the THEN block DOES NOT exit, then `x` remains falsy in the rest of the scope?
           // No, if `if (!x) return`, then `x` is truthy afterwards.
