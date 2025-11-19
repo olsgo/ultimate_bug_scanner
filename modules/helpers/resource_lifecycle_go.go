@@ -15,13 +15,13 @@ import (
 type resourceKind string
 
 const (
-	kindContext resourceKind = "context_cancel"
-	kindTicker  resourceKind = "ticker_stop"
-	kindTimer   resourceKind = "timer_stop"
-	kindFile    resourceKind = "file_handle"
-	kindDB      resourceKind = "db_handle"
+	kindContext  resourceKind = "context_cancel"
+	kindTicker   resourceKind = "ticker_stop"
+	kindTimer    resourceKind = "timer_stop"
+	kindFile     resourceKind = "file_handle"
+	kindDB       resourceKind = "db_handle"
 	kindListener resourceKind = "listener_close"
-	kindMutex   resourceKind = "mutex_lock"
+	kindMutex    resourceKind = "mutex_lock"
 )
 
 type resource struct {
@@ -94,7 +94,7 @@ func (a *analyzer) handleAssign(assign *ast.AssignStmt) {
 
 	// Handle multi-assignment: a, b := f(), g()
 	// Or single multi-return: a, b := f()
-	
+
 	// Case 1: Single RHS expression (function returning multiple values)
 	if len(assign.Rhs) == 1 {
 		call, ok := assign.Rhs[0].(*ast.CallExpr)
@@ -107,7 +107,7 @@ func (a *analyzer) handleAssign(assign *ast.AssignStmt) {
 		}
 		names := collectNames(assign.Lhs)
 		pos := a.fset.Position(assign.Pos())
-		
+
 		switch kind {
 		case kindContext:
 			// expect cancel func as last name
@@ -149,12 +149,12 @@ func (a *analyzer) handleAssign(assign *ast.AssignStmt) {
 			// But our tracked resources (os.Open) return (val, err), so they CANNOT appear here
 			// EXCEPT: time.NewTicker returns *Ticker (1 value).
 			// So we only track single-value returns here.
-			
+
 			name := names[i]
 			if name == "" || name == "_" {
 				continue
 			}
-			
+
 			// Context/Open return multiple values, so they won't be here.
 			// Ticker/Timer return 1 value.
 			if kind == kindTicker || kind == kindTimer {

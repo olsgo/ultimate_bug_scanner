@@ -493,8 +493,8 @@ ask() {
   # Method 3: No interactive channel available
   # This happens if running non-interactively (e.g. cron, non-tty pipe)
   # and we failed to access /dev/tty.
-  # We assume 'No' to be safe.
-  # Note: If we are uninstalling via pipe and /dev/tty is missing, this fails safely.
+  warn "Cannot prompt for input (stdin is not a TTY and /dev/tty unavailable)."
+  warn "Run with --non-interactive to accept defaults, or --easy-mode."
   return 1
 }
 

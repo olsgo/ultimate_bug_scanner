@@ -1409,18 +1409,18 @@ UBS stands for "Ultimate Bug Scanner": **The AI Coding Agent's Secret Weapon: Fl
 
 **Install:** `curl -sSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh | bash`
 
-**Golden Rule:** `ubs <changed-files>` before every commit. Exit 0 = safe. Exit >0 = fix & re-run.
+**Golden Rule:** `./ubs <changed-files>` before every commit. Exit 0 = safe. Exit >0 = fix & re-run.
 
 **Commands:**
 ```bash
-ubs file.ts file2.py                    # Specific files (< 1s) — USE THIS
-ubs $(git diff --name-only --cached)    # Staged files — before commit
-ubs --only=js,python src/               # Language filter (3-5x faster)
-ubs --ci --fail-on-warning .            # CI mode — before PR
-ubs --help                              # Full command reference
-ubs sessions --entries 1                # Tail the latest install session log
-ubs .                                   # Whole project (ignores things like .venv and node_modules automatically)
+./ubs file.ts file2.py                    # Specific files (< 1s) — USE THIS
+./ubs $(git diff --name-only --cached)    # Staged files — before commit
+./ubs --only=js,python src/               # Language filter (3-5x faster)
+./ubs --ci --fail-on-warning .            # CI mode — before PR
+./ubs --help                              # Full command reference
+./ubs sessions --entries 1                # Tail the latest install session log
 ```
+
 **Output Format:**
 ```
 ⚠️  Category (N errors)
