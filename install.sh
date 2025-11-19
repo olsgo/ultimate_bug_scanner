@@ -55,6 +55,7 @@ TYPE_NARROWING_READY=0
 SKIP_HOOKS=0
 INSTALL_DIR=""
 FORCE_REINSTALL=0
+FORCE_UNINSTALL=0
 SKIP_VERSION_CHECK=0
 RUN_VERIFICATION=1
 DRY_RUN=0
@@ -414,7 +415,21 @@ ask() {
     return 1  # Default to "no" in non-interactive mode
   fi
   local response
-  read -r -p "$(echo -e "${YELLOW}?${RESET} ${prompt} (y/N): ")" response
+  if [ -c /dev/tty ]; then
+    # Explicitly print to /dev/tty to ensure visibility when stdin is piped
+    # We use >/dev/tty for the prompt to guarantee it appears on the terminal
+    echo -ne "${YELLOW}?${RESET} ${prompt} (y/N): " > /dev/tty
+    if ! read -r response < /dev/tty; then
+      # Handle EOF or read error on tty
+      echo "" > /dev/tty
+      return 1
+    fi
+  else
+    # Fallback if no tty available (rare in interactive usage)
+    if ! read -r -p "$(echo -e "${YELLOW}?${RESET} ${prompt} (y/N): ")" response; then
+      return 1
+    fi
+  fi
   [[ "$response" =~ ^[Yy]$ ]]
 }
 
