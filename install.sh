@@ -460,7 +460,9 @@ if [ -n "${UBS_INSTALLER_WORKDIR:-}" ]; then
     exit 1
   fi
 else
-  WORKDIR="$(mktemp -d 2>/dev/null || mktemp -d -t ubs-install)"
+  # GNU mktemp requires X placeholders when using -t; macOS adds them automatically.
+  # Provide explicit template so both implementations succeed.
+  WORKDIR="$(mktemp -d 2>/dev/null || mktemp -d -t ubs-install.XXXXXX)"
 fi
 TEMP_FILES+=("$WORKDIR")
 
