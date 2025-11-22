@@ -75,14 +75,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends ca-certificates curl dpkg-dev coreutils minisign
 
           # jq (static binary)
-          curl -fsSLo /usr/local/bin/jq https://github.com/jqlang/jq/releases/download/${JQ_VERSION}/jq-linux-amd64
+          curl -fsSLo /usr/local/bin/jq "https://github.com/jqlang/jq/releases/download/${JQ_VERSION}/jq-linux-amd64"
           echo "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5  /usr/local/bin/jq" | sha256sum --check --status
           chmod +x /usr/local/bin/jq
 
           # ripgrep (13.0.0 deb)
-          curl -fsSLo /tmp/ripgrep_${RG_VERSION}_amd64.deb https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep_${RG_VERSION}_amd64.deb
+          curl -fsSLo "/tmp/ripgrep_${RG_VERSION}_amd64.deb" "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep_${RG_VERSION}_amd64.deb"
           echo "6d78bed13722019cb4f9d0cf366715e2dcd589f4cf91897efb28216a6bb319f1  /tmp/ripgrep_${RG_VERSION}_amd64.deb" | sha256sum --check --status
-          sudo dpkg -i /tmp/ripgrep_${RG_VERSION}_amd64.deb
+          sudo dpkg -i "/tmp/ripgrep_${RG_VERSION}_amd64.deb"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -93,7 +93,7 @@ jobs:
 
       - name: Verify tag matches VERSION file
         run: |
-          FILE_VERSION=$(cat VERSION | tr -d '\r\n')
+          FILE_VERSION=$(tr -d '\r\n' < VERSION)
           if [ "$FILE_VERSION" != "$VERSION" ]; then
             echo "VERSION file ($FILE_VERSION) does not match tag ($VERSION)" >&2
             exit 1
@@ -127,28 +127,29 @@ jobs:
         run: |
           UBS_SHA=$(sha256sum ubs | cut -d' ' -f1)
           cat > dist/ubs.rb <<'RUBY'
-class Ubs < Formula
-  desc "Ultimate Bug Scanner meta-runner"
-  homepage "https://github.com/Dicklesworthstone/ultimate_bug_scanner"
-RUBY
+          class Ubs < Formula
+            desc "Ultimate Bug Scanner meta-runner"
+            homepage "https://github.com/Dicklesworthstone/ultimate_bug_scanner"
+          RUBY
           {
             echo "  version \"$VERSION\""
             echo "  url \"https://github.com/Dicklesworthstone/ultimate_bug_scanner/releases/download/v$VERSION/ubs\""
             echo "  sha256 \"$UBS_SHA\""
           } >> dist/ubs.rb
           cat >> dist/ubs.rb <<'RUBY'
-  license "MIT"
+          license "MIT"
 
-  def install
-    chmod 0555, "ubs"
-    bin.install "ubs"
-  end
+          def install
+            chmod 0555, "ubs"
+            bin.install "ubs"
+          end
 
-  test do
-    system "#{bin}/ubs", "--help"
-  end
-end
-RUBY
+          test do
+            system "#{bin}/ubs", "--help"
+          end
+          end
+          RUBY
+          perl -pi -e 's/^ {10}//' dist/ubs.rb
 
       - name: Assemble release payload
         run: |
@@ -237,28 +238,29 @@ RUBY
       - name: Generate provenance predicate (SLSA v1)
         run: |
           cat > provenance.json <<'EOF'
-{
-  "_type": "https://in-toto.io/Statement/v1",
-  "subject": [
-    { "name": "${{ env.IMAGE_NAME }}", "digest": { "sha256": "${{ steps.digest.outputs.sha }}" } }
-  ],
-  "predicateType": "https://slsa.dev/provenance/v1",
-  "predicate": {
-    "buildDefinition": {
-      "buildType": "https://slsa.dev/provenance/v1",
-      "externalParameters": {
-        "source": "${{ github.repository }}",
-        "ref": "${{ github.ref }}",
-        "sha": "${{ github.sha }}"
-      }
-    },
-    "runDetails": {
-      "builder": { "id": "https://github.com/actions" },
-      "metadata": { "invocationId": "${{ github.run_id }}" }
-    }
-  }
-}
-EOF
+          {
+            "_type": "https://in-toto.io/Statement/v1",
+            "subject": [
+              { "name": "${{ env.IMAGE_NAME }}", "digest": { "sha256": "${{ steps.digest.outputs.sha }}" } }
+            ],
+            "predicateType": "https://slsa.dev/provenance/v1",
+            "predicate": {
+              "buildDefinition": {
+                "buildType": "https://slsa.dev/provenance/v1",
+                "externalParameters": {
+                  "source": "${{ github.repository }}",
+                  "ref": "${{ github.ref }}",
+                  "sha": "${{ github.sha }}"
+                }
+              },
+              "runDetails": {
+                "builder": { "id": "https://github.com/actions" },
+                "metadata": { "invocationId": "${{ github.run_id }}" }
+              }
+            }
+          }
+          EOF
+          perl -pi -e 's/^ {10}//' provenance.json
 
       - name: Attach provenance attestation (SLSA v1)
         env:
