@@ -1633,10 +1633,10 @@ YAML
 id: js.then-without-catch
 language: javascript
 rule:
-  pattern: $P.then($ARGS)
+  pattern: \$P.then(\$ARGS)
   not:
     has:
-      pattern: .catch($CATCH)
+      pattern: .catch(\$CATCH)
 severity: ${PROMISE_SEV}
 message: "Promise.then without catch/finally; handle rejections"
 YAML
@@ -1645,17 +1645,17 @@ YAML
 id: js.async.then-no-catch
 language: javascript
 rule:
-  pattern: $P.then($ARGS)
+  pattern: \$P.then(\$ARGS)
   not:
     has:
-      pattern: .catch($CATCH)
+      pattern: .catch(\$CATCH)
 severity: ${PROMISE_SEV}
 message: "Promise.then without .catch/.finally; add rejection handling"
 YAML
   cat >"$AST_RULE_DIR/async-promiseall-no-try.yml" <<YAML
 id: js.async.promiseall-no-try
 language: javascript
-rule: { pattern: await Promise.all($ARGS), not: { inside: { kind: try_statement } } }
+rule: { pattern: await Promise.all(\$ARGS), not: { inside: { kind: try_statement } } }
 severity: ${PROMISE_SEV}
 message: "await Promise.all() without try/catch; wrap to handle aggregate failures"
 YAML
@@ -1799,7 +1799,7 @@ YAML
 id: js.json-parse-without-try
 language: javascript
 rule:
-  pattern: JSON.parse($X)
+  pattern: JSON.parse(\$X)
   not:
     inside:
       kind: try_statement
@@ -1813,15 +1813,15 @@ language: javascript
 rule:
   all:
     - any:
-        - pattern: $CALLEE($ARGS)
-        - pattern: new $CALLEE($ARGS)
+        - pattern: \$CALLEE(\$ARGS)
+        - pattern: new \$CALLEE(\$ARGS)
     - not:
         inside:
           any:
-            - pattern: await $EXPR
-            - pattern: $EXPR.then($ARGS)
-            - pattern: Promise.all($ARGS)
-            - pattern: Promise.race($ARGS)
+            - pattern: await \$EXPR
+            - pattern: \$EXPR.then(\$ARGS)
+            - pattern: Promise.all(\$ARGS)
+            - pattern: Promise.race(\$ARGS)
 severity: ${PROMISE_SEV}
 message: "Possible unhandled/dangling promise; use await/then/catch"
 YAML
@@ -1830,12 +1830,12 @@ YAML
 id: js.fetch.no-catch
 language: javascript
 rule:
-  pattern: fetch($ARGS)
+  pattern: fetch(\$ARGS)
   not:
     inside:
       any:
-        - pattern: try { $TRY_BODY } catch ($E) { $CATCH_BODY }
-        - pattern: .catch($CATCH)
+        - pattern: try { \$TRY_BODY } catch (\$E) { \$CATCH_BODY }
+        - pattern: .catch(\$CATCH)
 severity: ${PROMISE_SEV}
 message: "fetch() without catch/try; network failures will be unhandled"
 YAML
