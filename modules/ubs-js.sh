@@ -2167,7 +2167,10 @@ print_category "Detects: Division by zero, NaN propagation, floating-point equal
 print_subheader "Division operations (potential ÷0)"
 count=$(
   ( "${GREP_RN[@]}" -e "/[[:space:]]*[A-Za-z_][A-Za-z0-9_]*" "$PROJECT_DIR" 2>/dev/null || true ) \
-    | (grep -Ev "/[[:space:]]*(255|2|10|100|1000)\b|//|/\*" || true) | count_lines)
+    | grep -vE '^\s*//' \
+    | grep -vE "[\"']" \
+    | grep -Ev "/[[:space:]]*(255|2|10|100|1000)\b" \
+    | count_lines)
 if [ "$count" -gt 25 ]; then
   print_finding "warning" "$count" "Division by variable - verify non-zero" "Add guards: if (divisor === 0) throw; or use fallback"
   show_detailed_finding "/[[:space:]]*[A-Za-z_][A-Za-z0-9_]*" 5
@@ -2758,10 +2761,14 @@ print_category "Detects: var usage, global pollution, shadowing" \
   "Scope bugs cause hard-to-debug variable conflicts"
 
 print_subheader "var declarations (use let/const)"
-count=$("${GREP_RNW[@]}" "\bvar\b" "$PROJECT_DIR" 2>/dev/null | count_lines || true)
+if [ "$HAS_AST_GREP" -eq 1 ]; then
+  count=$(ast_search 'var $X = $$' || echo 0)
+else
+  count=$("${GREP_RN[@]}" -e "^[[:space:]]*var[[:space:]]+[A-Za-z_$][A-Za-z0-9_$]*" "$PROJECT_DIR" 2>/dev/null | count_lines || true)
+fi
 if [ "$count" -gt 0 ]; then
   print_finding "warning" "$count" "Using 'var' instead of let/const" "var is function-scoped and hoisted"
-  show_detailed_finding "\bvar\b" 5
+  show_detailed_finding "^[[:space:]]*var[[:space:]]+[A-Za-z_$][A-Za-z0-9_$]*" 5
 else
   print_finding "good" "No var declarations (using let/const)"
 fi
@@ -2809,6 +2816,7 @@ def scan_file(path):
             text = path.read_text(encoding='latin-1')
         except Exception:
             return
+    is_jsx = path.suffix in {'.jsx', '.tsx'}
     declared = set(name for _, name in decl_re.findall(text))
     for match in destruct_re.finditer(text):
         entries = match.group(2).split(',')
@@ -2840,6 +2848,9 @@ def scan_file(path):
     for idx, line in enumerate(lines, 1):
         stripped = line.strip()
         if not stripped or stripped.startswith('//'):
+            continue
+        # Heuristic: skip JSX attributes/props to avoid false positives
+        if is_jsx and '<' in stripped and '>' in stripped:
             continue
         match = assign_re.match(line)
         if not match:
