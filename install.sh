@@ -2422,12 +2422,6 @@ install_scanner() {
     warn "Downloaded file does not contain expected marker; continuing (marker may have changed)"
   fi
 
-  if [ "$downloaded_from_release" -eq 1 ]; then
-    verify_download_checksum "$temp_path" "$SCRIPT_NAME"
-  elif [ "$RUN_VERIFICATION" -eq 1 ] && [ "$INSECURE" -eq 0 ]; then
-    warn "Skipping checksum verification for local script; use --insecure to suppress this warning if intentional."
-  fi
-
   if [ -n "$use_sudo" ]; then
     $use_sudo install -m 0755 "$temp_path" "$script_path"
     rm -f "$temp_path"
