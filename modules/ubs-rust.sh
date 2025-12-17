@@ -2033,6 +2033,7 @@ else
   print_finding "info" 1 "cargo not available or disabled; style/lints skipped"
 fi
 fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CATEGORY 13: BUILD HEALTH (check/test)
@@ -2058,6 +2059,7 @@ if [[ "$RUN_CARGO" -eq 1 && "$HAS_CARGO" -eq 1 ]]; then
   if [[ "$w" -gt 0 ]]; then print_finding "warning" "$w" "Test build warnings"; add_finding "warning" "$w" "Test build warnings" "" "${CATEGORY_NAME[13]}"; else print_finding "good" "Tests build clean"; fi
 else
   print_finding "info" 1 "cargo disabled/unavailable; build checks skipped"
+fi
 fi
 fi
 
@@ -2373,7 +2375,7 @@ echo ""
 say "${WHITE}${BOLD}Summary Statistics:${RESET}"
 say "  ${WHITE}Files scanned:${RESET}    ${CYAN}$TOTAL_FILES${RESET}"
 say "  ${RED}${BOLD}Critical issues:${RESET}  ${RED}$CRITICAL_COUNT${RESET}"
-say "  ${YELLOW}Warning issues:${RESET}   ${YELLOW}$WARNING_COUNT${RESET}
+say "  ${YELLOW}Warning issues:${RESET}   ${YELLOW}$WARNING_COUNT${RESET}"
 say "  ${BLUE}Info items:${RESET}       ${BLUE}$INFO_COUNT${RESET}"
 echo ""
 
@@ -2388,7 +2390,7 @@ if [ "$WARNING_COUNT" -gt 0 ]; then
 fi
 if [ "$INFO_COUNT" -gt 0 ]; then
   say "  ${BLUE}${INFO} ${BOLD}Consider INFO suggestions${RESET}"
-  say "  ${DIM}Code quality improvements and best practices${RESET}
+  say "  ${DIM}Code quality improvements and best practices${RESET}"
 fi
 
 if [ "$CRITICAL_COUNT" -eq 0 ] && [ "$WARNING_COUNT" -eq 0 ]; then
