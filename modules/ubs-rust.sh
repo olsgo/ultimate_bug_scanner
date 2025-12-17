@@ -1801,7 +1801,7 @@ if [ "$await_loop" -gt 0 ]; then print_finding "info" "$await_loop" "await insid
 
 print_subheader "Blocking ops inside async (thread::sleep, std::fs)"
 sleep_async=$(( $(ast_search 'std::thread::sleep($$)' || echo 0) + $("${GREP_RN[@]}" -e "thread::sleep\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
-fs_async=$(( $(ast_search 'std::fs::read($$)' || echo 0) + $("${GREP_RN[@]}" -e "std::fs::(read|read_to_string|write|rename|copy|remove_file)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+fs_async=$(( $(ast_search 'std::fs::read($$)' || echo 0) + $("${GREP_RN[@]}" -e "std::fs::(read|read_to_string|write|rename|copy|remove_file)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$sleep_async" -gt 0 ]; then print_finding "warning" "$sleep_async" "thread::sleep in async"; add_finding "warning" "$sleep_async" "thread::sleep in async" "" "${CATEGORY_NAME[3]}"; fi
 if [ "$fs_async" -gt 0 ]; then print_finding "info" "$fs_async" "Blocking std::fs in async code"; add_finding "info" "$fs_async" "Blocking std::fs in async code" "" "${CATEGORY_NAME[3]}"; fi
 
@@ -1912,7 +1912,7 @@ print_category "Detects: TLS verification disabled, weak hash algos, HTTP URLs, 
   "Security misconfigurations can lead to credential leaks and MITM attacks"
 
 print_subheader "Weak hash algorithms (MD5/SHA1)"
-weak_hash=$(( $(ast_search 'md5::$F($$)' || echo 0) + $(ast_search 'sha1::$F($$)' || echo 0) + $("${GREP_RN[@]}" -e "SHA1_FOR_LEGACY_USE_ONLY|MessageDigest::(md5|sha1)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+weak_hash=$(( $(ast_search 'md5::$F($$)' || echo 0) + $(ast_search 'sha1::$F($$)' || echo 0) + $("${GREP_RN[@]}" -e "SHA1_FOR_LEGACY_USE_ONLY|MessageDigest::(md5|sha1)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$weak_hash" -gt 0 ]; then print_finding "warning" "$weak_hash" "Weak hash algorithm usage (MD5/SHA1)"; show_detailed_finding "md5::|sha1::|SHA1_FOR_LEGACY_USE_ONLY|MessageDigest::(md5|sha1)" 5; add_finding "warning" "$weak_hash" "Weak hash algorithm usage (MD5/SHA1)" "" "${CATEGORY_NAME[8]}" "$(collect_samples_rg "md5::|sha1::|SHA1_FOR_LEGACY_USE_ONLY|MessageDigest::(md5|sha1)" 5)"; else print_finding "good" "No MD5/SHA1 found"; fi
 
 print_subheader "TLS verification disabled"
@@ -2208,7 +2208,7 @@ print_category "Detects: locks acquired in async fns and potentially held across
   "Holding locks across await can deadlock, starve tasks, and cause latency spikes; std::sync locks can block executor threads"
 
 print_subheader "std::sync lock usage inside async fn (blocking risk)"
-std_lock_async=$(( $(ast_search 'async fn $N($$) { $$ $M.lock() $$ }' || echo 0) + $(ast_search 'async fn $N($$) { $$ $M.read() $$ }' || echo 0) + $(ast_search 'async fn $N($$) { $$ $M.write() $$ }' || echo 0) + $("${GREP_RN[@]}" -e "async\s+fn[^{]*\{[^}]*\.(lock|read|write)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+std_lock_async=$(( $(ast_search 'async fn $N($$) { $$ $M.lock() $$ }' || echo 0) + $(ast_search 'async fn $N($$) { $$ $M.read() $$ }' || echo 0) + $(ast_search 'async fn $N($$) { $$ $M.write() $$ }' || echo 0) + $("${GREP_RN[@]}" -e "async\s+fn[^{]*\{[^}]*\.(lock|read|write)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$std_lock_async" -gt 0 ]; then
   print_finding "warning" "$std_lock_async" "Blocking std::sync locks in async functions" "Prefer tokio::sync locks or spawn_blocking; avoid blocking executor threads"
   add_finding "warning" "$std_lock_async" "Blocking std::sync locks in async functions" "Prefer tokio::sync locks or spawn_blocking; avoid blocking executor threads" "${CATEGORY_NAME[20]}" "$(collect_samples_rg "async\s+fn[^{]*\{[^}]*\.(lock|read|write)\(" 3)"
@@ -2257,7 +2257,7 @@ fi
 
 print_subheader "panic!/unwrap/expect inside Drop"
 drop_panic=$(( $(ast_search 'panic!($$)' || echo 0) + $("${GREP_RN[@]}" -e "impl\s+Drop\s+for|fn\s+drop\(&mut\s+self\)" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
-drop_panic_hits=$("${GREP_RN[@]}" -e "fn\s+drop\(&mut\s+self\)|impl\s+Drop\s+for" "$PROJECT_DIR" 2>/dev/null | (grep -A25 -E "panic!\(|\.(unwrap|expect)\("(" || true) | (grep -Ec "panic!\(|\.(unwrap|expect)\("(" || true))
+drop_panic_hits=$("${GREP_RN[@]}" -e "fn\s+drop\(&mut\s+self\)|impl\s+Drop\s+for" "$PROJECT_DIR" 2>/dev/null | (grep -A25 -E "panic!\(|\.(unwrap|expect)\(" || true) | (grep -Ec "panic!\(|\.(unwrap|expect)\(" || true))
 drop_panic_hits=$(printf '%s\n' "${drop_panic_hits:-0}" | awk 'END{print $0+0}')
 if [ "$drop_panic_hits" -gt 0 ]; then
   print_finding "warning" "$drop_panic_hits" "Potential panics inside Drop implementations" "Panics during Drop + unwinding can abort; avoid unwrap/expect/panic in destructors"
@@ -2284,7 +2284,7 @@ else
 fi
 
 print_subheader "try_into().unwrap()/expect() (panic on conversion failure)"
-try_into_unwrap=$(( $(ast_search '$X.try_into().unwrap()' || echo 0) + $(ast_search '$X.try_into().expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "\.try_into\(\)\.(unwrap|expect)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+try_into_unwrap=$(( $(ast_search '$X.try_into().unwrap()' || echo 0) + $(ast_search '$X.try_into().expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "\.try_into\(\)\.(unwrap|expect)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$try_into_unwrap" -gt 0 ]; then
   print_finding "warning" "$try_into_unwrap" "try_into().unwrap()/expect() present" "Handle conversion errors explicitly; panics can be input-dependent"
   add_finding "warning" "$try_into_unwrap" "try_into().unwrap()/expect() present" "Handle conversion errors explicitly; panics can be input-dependent" "${CATEGORY_NAME[22]}" "$(collect_samples_rg "\.try_into\(\)\.(unwrap|expect)\(" 3)"
@@ -2300,21 +2300,21 @@ print_category "Detects: parse/from_str/env-var unwraps, decode unwraps, missing
   "Parsing and decoding failures often happen in prod on edge inputs; unwrap/expect turns them into panics"
 
 print_subheader "parse::<T>().unwrap()/expect()"
-parse_unwrap=$(( $(ast_search '$S.parse::<$T>().unwrap()' || echo 0) + $(ast_search '$S.parse::<$T>().expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "\.parse::<[^>]+>\(\)\.(unwrap|expect)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+parse_unwrap=$(( $(ast_search '$S.parse::<$T>().unwrap()' || echo 0) + $(ast_search '$S.parse::<$T>().expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "\.parse::<[^>]+>\(\)\.(unwrap|expect)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$parse_unwrap" -gt 0 ]; then
   print_finding "warning" "$parse_unwrap" "parse::<T>().unwrap()/expect() present" "Validate input or propagate errors with context"
   add_finding "warning" "$parse_unwrap" "parse::<T>().unwrap()/expect() present" "Validate input or propagate errors with context" "${CATEGORY_NAME[23]}" "$(collect_samples_rg "\.parse::<[^>]+>\(\)\.(unwrap|expect)\(" 3)"
 fi
 
 print_subheader "serde_json::from_str(...).unwrap()/expect()"
-serde_unwrap=$(( $(ast_search 'serde_json::from_str($S).unwrap()' || echo 0) + $(ast_search 'serde_json::from_str($S).expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "serde_json::from_str\([^)]*\)\.(unwrap|expect)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+serde_unwrap=$(( $(ast_search 'serde_json::from_str($S).unwrap()' || echo 0) + $(ast_search 'serde_json::from_str($S).expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "serde_json::from_str\([^)]*\)\.(unwrap|expect)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$serde_unwrap" -gt 0 ]; then
   print_finding "warning" "$serde_unwrap" "serde_json::from_str(...).unwrap()/expect()" "Add context, validation, and schema checks; avoid panics on malformed JSON"
   add_finding "warning" "$serde_unwrap" "serde_json::from_str(...).unwrap()/expect()" "Add context, validation, and schema checks; avoid panics on malformed JSON" "${CATEGORY_NAME[23]}" "$(collect_samples_rg "serde_json::from_str\([^)]*\)\.(unwrap|expect)\(" 3)"
 fi
 
 print_subheader "std::env::var(...).unwrap()/expect()"
-env_unwrap=$(( $(ast_search 'std::env::var($K).unwrap()' || echo 0) + $(ast_search 'std::env::var($K).expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "std::env::var\([^)]*\)\.(unwrap|expect)\("(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
+env_unwrap=$(( $(ast_search 'std::env::var($K).unwrap()' || echo 0) + $(ast_search 'std::env::var($K).expect($MSG)' || echo 0) + $("${GREP_RN[@]}" -e "std::env::var\([^)]*\)\.(unwrap|expect)\(" "$PROJECT_DIR" 2>/dev/null | count_lines || true) ))
 if [ "$env_unwrap" -gt 0 ]; then
   print_finding "warning" "$env_unwrap" "env::var(...).unwrap()/expect()" "Handle missing/invalid env vars with defaults or clear error propagation"
   add_finding "warning" "$env_unwrap" "env::var(...).unwrap()/expect()" "Handle missing/invalid env vars with defaults or clear error propagation" "${CATEGORY_NAME[23]}" "$(collect_samples_rg "std::env::var\([^)]*\)\.(unwrap|expect)\(" 3)"
