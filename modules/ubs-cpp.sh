@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-# ULTIMATE C++ BUG SCANNER v7.0 - Industrial-Grade Code Quality Analysis
+# ULTIMATE C++ BUG SCANNER v7.1 - Industrial-Grade Code Quality Analysis
 # ═══════════════════════════════════════════════════════════════════════════
 # Comprehensive static analysis for modern C++ (C++20+) using ast-grep
 # + smart regex/ripgrep heuristics and CMake build hygiene checks.
 # Detects: RAII violations, lifetime bugs, exception pitfalls, concurrency
 # hazards, UB-prone code, preprocessor traps, modernization gaps, and more.
-# v7.0 adds: single-pass ast-grep with cached JSON, path-list aware scanning,
+# v7.1 adds: single-pass ast-grep with cached JSON, path-list aware scanning,
 # stronger regexes, mac/BSD portability, fixed min/max regex, ruleset expansion,
 # detail wrappers, category list command, and correctness/robustness fixes.
 # ═══════════════════════════════════════════════════════════════════════════
@@ -98,8 +98,8 @@ Options:
   --only=CSV               Run only these categories (e.g. --only=1,7,12)
   --fail-on-warning        Exit non-zero on warnings or critical
   --rules=DIR              Additional ast-grep rules directory (merged)
-  --respect-gitignore[=0|1]  Respect VCS ignore (default: 1)
-  --hidden[=0|1]           Scan hidden files/dirs (default: 0)
+  --respect-gitignore=0|1  Respect VCS ignore (default: 1)
+  --hidden=0|1           Scan hidden files/dirs (default: 0)
   --max-filesize=SIZE      Max file size for rg (e.g. 1M, 5M)
   --paths-from=FILE        Read newline-separated files to scan
   -h, --help               Show help
@@ -255,10 +255,105 @@ if command -v rg >/dev/null 2>&1; then
   GREP_RNW=(rg -w "${RG_BASE[@]}" "${RG_EXCLUDES[@]}" "${RG_INCLUDES[@]}")
   RG_JOBS=()
 else
-  GREP_R_OPTS=(-R --binary-files=without-match "${EXCLUDE_FLAGS[@]}" "${INCLUDE_GLOBS[@]}")
-  GREP_RN=("grep" "${GREP_R_OPTS[@]}" -n -E)
-  GREP_RNI=("grep" "${GREP_R_OPTS[@]}" -n -i -E)
-  GREP_RNW=("grep" "${GREP_R_OPTS[@]}" -n -w -E)
+  # Portable grep fallback + strict-gitignore support (even without rg).
+  UBS_GREP_FILELIST0=""
+  UBS_GREP_READY=0
+  build_grep_filelist() {
+    [[ "$UBS_GREP_READY" -eq 1 ]] && return 0
+    UBS_GREP_FILELIST0="$(mktemp 2>/dev/null || mktemp -t ubs-grep-files.XXXXXX)"
+    trap 'rm -f "$UBS_GREP_FILELIST0" 2>/dev/null || true' EXIT
+    : >"$UBS_GREP_FILELIST0"
+    
+    # Build prune expr
+    local -a ex_prune=()
+    for d in "${EXCLUDE_DIRS[@]}"; do ex_prune+=( -name "$d" -o ); done
+    ex_prune=( \( -type d \( "${ex_prune[@]}" -false \) -prune \) )
+    
+    # Build name expr
+    local -a name_expr=( \( )
+    local first=1
+    for e in "${_EXT_ARR[@]}"; do
+      if [[ $first -eq 1 ]]; then name_expr+=( -name "*.${e}" ); first=0
+      else name_expr+=( -o -name "*.${e}" ); fi
+    done
+    name_expr+=( \) )
+
+    local -a cand_abs=() cand_rel=()
+    while IFS= read -r -d '' f; do
+      cand_abs+=("$f")
+      local rel="$f"
+      if [[ "$PROJECT_DIR" == "." ]]; then rel="${f#./}"
+      else rel="${f#"$PROJECT_DIR"/}"; fi
+      cand_rel+=("$rel")
+    done < <(find "${SCAN_PATHS[@]}" "${ex_prune[@]}" -o \( -type f "${name_expr[@]}" -print0 \) 2>/dev/null || true)
+
+    if [[ "$RESPECT_GITIGNORE" -eq 1 && "$(command -v git >/dev/null 2>&1; echo $?)" -eq 0 ]]; then
+      if git -C "$PROJECT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local tmp_rel tmp_ign
+        tmp_rel="$(mktemp 2>/dev/null || mktemp -t ubs-git-rel.XXXXXX)"
+        tmp_ign="$(mktemp 2>/dev/null || mktemp -t ubs-git-ign.XXXXXX)"
+        : >"$tmp_rel"; : >"$tmp_ign"
+        local r
+        for r in "${cand_rel[@]}"; do printf '%s\0' "$r" >>"$tmp_rel"; done
+        git -C "$PROJECT_DIR" check-ignore -z --stdin <"$tmp_rel" >"$tmp_ign" 2>/dev/null || true
+        declare -A _IGN=()
+        if [[ -s "$tmp_ign" ]]; then
+          while IFS= read -r -d '' p; do _IGN["$p"]=1; done <"$tmp_ign" || true
+        fi
+        local i
+        for i in "${!cand_abs[@]}"; do
+          local relp="${cand_rel[$i]}"
+          if [[ -z "${_IGN[$relp]:-}" ]]; then printf '%s\0' "${cand_abs[$i]}" >>"$UBS_GREP_FILELIST0"; fi
+        done
+        rm -f "$tmp_rel" "$tmp_ign"
+        unset _IGN
+      else
+        printf '%s\0' "${cand_abs[@]}" >>"$UBS_GREP_FILELIST0"
+      fi
+    else
+      printf '%s\0' "${cand_abs[@]}" >>"$UBS_GREP_FILELIST0"
+    fi
+    UBS_GREP_READY=1
+  }
+
+  ubs_grep() {
+    build_grep_filelist || true
+    local -a args=("$@")
+    [[ ${#args[@]} -gt 0 ]] || return 0
+    local target="${args[$((${#args[@]}-1))]}"
+    local -a cmd=(grep -H --binary-files=without-match)
+    local got_pat=0
+    local i=0
+    while [[ $i -lt $((${#args[@]}-1)) ]]; do
+      case "${args[$i]}" in
+        -n|-i|-w|-E|-F) cmd+=("${args[$i]}");;
+        -e) cmd+=(-e "${args[$((i+1))]}"); got_pat=1; i=$((i+1));;
+        --exclude-dir=*|--include=*|--binary-files=*|-R) :;;
+        *)
+          if [[ $got_pat -eq 0 && "${args[$i]}" != -* ]]; then cmd+=(-e "${args[$i]}"); got_pat=1; fi
+          ;;
+      esac
+      i=$((i+1))
+    done
+    [[ $got_pat -eq 1 ]] || return 0
+    
+    # If target matches one of our scan paths exactly, use the filelist
+    # Otherwise just grep the target directly
+    local use_list=0
+    for sp in "${SCAN_PATHS[@]}"; do
+      if [[ "$target" == "$sp" ]]; then use_list=1; fi
+    done
+
+    if [[ "$use_list" -eq 1 && -s "$UBS_GREP_FILELIST0" ]]; then
+      # shellcheck disable=SC2094
+      xargs -0 "${cmd[@]}" <"$UBS_GREP_FILELIST0" 2>/dev/null || true
+    else
+      "${cmd[@]}" "$target" 2>/dev/null || true
+    fi
+  }
+  GREP_RN=(ubs_grep -n -E)
+  GREP_RNI=(ubs_grep -n -i -E)
+  GREP_RNW=(ubs_grep -n -w -E)
 fi
 
 # Helper: robust numeric end-of-pipeline counter
@@ -842,7 +937,75 @@ run_ast_once() {
 ast_count() {
   local id="$1"
   [[ -n "$AST_JSON_FILE" && -f "$AST_JSON_FILE" ]] || { printf '0\n'; return 0; }
-  grep -o "\"id\"[[:space:]]*:[[:space:]]*\"${id//\//\\/}\"" "$AST_JSON_FILE" | count_lines
+  
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$AST_JSON_FILE" "$id" <<'PY'
+import json, sys, os
+
+path = sys.argv[1]
+target_id = sys.argv[2]
+
+try:
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+except Exception:
+    print("0")
+    sys.exit(0)
+
+count = 0
+file_cache = {}
+
+def check_suppression(fpath, line_no):
+    if not fpath or line_no <= 0: return False
+    if fpath not in file_cache:
+        try:
+            with open(fpath, 'r', encoding='utf-8', errors='ignore') as src:
+                file_cache[fpath] = src.readlines()
+        except Exception:
+            file_cache[fpath] = []
+    
+    lines = file_cache[fpath]
+    idx = line_no - 1
+    # Check current line and previous line
+    if 0 <= idx < len(lines) and 'ubs:ignore' in lines[idx]: return True
+    if 0 <= idx - 1 < len(lines) and 'ubs:ignore' in lines[idx-1]: return True
+    return False
+
+def walk(obj):
+    global count
+    if isinstance(obj, dict):
+        rid = obj.get('id') or obj.get('ruleId')
+        if rid == target_id:
+            # Check suppression
+            f = obj.get('file') or obj.get('path')
+            start = obj.get('range', {}).get('start', {})
+            line = start.get('line')
+            if line is None: line = start.get('row')
+            
+            # line is 0-based in ast-grep JSON usually, need 1-based for display/suppression check?
+            # actually ubs-js.sh treated it as 0-based index for array access.
+            # let's assume 0-based from JSON.
+            # check_suppression takes 1-based line_no for convenience or 0-based?
+            # let's use 1-based line_no for the function signature.
+            
+            if line is not None:
+                if not check_suppression(f, int(line) + 1):
+                    count += 1
+            else:
+                count += 1
+        for k, v in obj.items():
+            walk(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            walk(item)
+
+walk(data)
+print(count)
+PY
+  else
+    # Fallback to grep (no suppression support)
+    grep -o "\"id\"[[:space:]]*:[[:space:]]*\"${id//\//\\/}\"" "$AST_JSON_FILE" | count_lines
+  fi
 }
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -968,10 +1131,8 @@ count1=$(ast_count "cpp.raw-new")
 count2=$(ast_count "cpp.raw-new-array")
 total=$((count1 + count2))
 if [ "$total" -gt 0 ]; then
-  print_finding "warning" "$total" "Raw new/new[] found" "Use std::make_unique/std::make_shared or containers"
-  show_detailed_finding "\\bnew[[:space:]]+[A-Za-z_:][A-Za-z0-9_:<>]*" 5
-else
-  print_finding "good" "No raw new detected"
+  print_finding "warning" "$total" "Raw new found" "Use std::make_unique/std::make_shared or containers"
+  show_detailed_finding "\\bnew[[:space:]]+[A-Za-z_:][A-Za-z0-9_:<>]*[[:space:]]*" 5
 fi
 
 print_subheader "Manual delete (leaks/double free risk)"
@@ -979,8 +1140,6 @@ count=$(search_count "(^|[^A-Za-z0-9_])delete[[:space:]]*(\\[\\])?")
 if [ "$count" -gt 0 ]; then
   print_finding "critical" "$count" "Manual delete/delete[] present" "Prefer RAII via smart pointers or containers"
   show_detailed_finding "\\bdelete(\\[\\])?" 5
-else
-  print_finding "good" "No delete/delete[] detected"
 fi
 
 print_subheader "C-style casts"
@@ -1048,8 +1207,6 @@ lock_count=$(search_count "\\.lock\\(|\\.unlock\\(")
 if [ "$lock_count" -gt 0 ]; then
   print_finding "warning" "$lock_count" "Manual lock/unlock usage" "Use std::lock_guard/std::unique_lock"
   show_detailed_finding "\\.lock\\(|\\.unlock\\(" 5
-else
-  print_finding "good" "No manual lock/unlock"
 fi
 
 print_subheader "std::async without explicit launch policy"
@@ -1149,8 +1306,6 @@ count=$(search_count "\\b(gets|strcpy|strcat|sprintf|scanf)\\s*\\(")
 if [ "$count" -gt 0 ]; then
   print_finding "critical" "$count" "Unsafe C APIs present" "Use safer std/fmt equivalents"
   show_detailed_finding "\\b(gets|strcpy|strcat|sprintf|scanf)\\s*\\(" 5
-else
-  print_finding "good" "No unsafe C APIs found"
 fi
 
 print_subheader "reinterpret_cast/const_cast occurrences"
